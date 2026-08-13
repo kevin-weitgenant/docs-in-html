@@ -145,11 +145,43 @@
     return null;
   }
 
-  fetch("/__manifest__").then(function (r) { return r.json(); }).then(function (tree) {
+  // Keep the sidebar in sync as files/folders are added, removed, or renamed.
+  // We re-fetch the manifest on every change but only rebuild the DOM when the
+  // set of entries actually changed — so ordinary content edits don't wipe your
+  // collapse state / scroll position / active doc.
+  var currentSignature = null;
+  function signature(nodes) {
+    var out = [];
+    (function walk(arr) {
+      (arr || []).forEach(function (n) {
+        out.push((n.type === "folder" ? "d:" : "f:") + n.path);
+        if (n.type === "folder") walk(n.children);
+      });
+    })(nodes);
+    return out.join("|");
+  }
+  function applyTree(tree) {
+    if (!tree) return;
+    var sig = signature(tree);
+    if (sig === currentSignature) return;       // only content changed → keep sidebar state
+    currentSignature = sig;
+    var scroller = navAside || list;
+    var scrollTop = scroller.scrollTop;
     build(tree);
     if (iframe && !iframe.getAttribute("src")) { var f = firstDoc(tree); if (f) go(f); }
     syncFromIframe();
-  }).catch(function () { /* no server / no manifest → keep the static #docList */ });
+    scroller.scrollTop = scrollTop;             // preserve sidebar scroll across rebuild
+  }
+
+  function refresh() {
+    fetch("/__manifest__", { cache: "no-store" }).then(function (r) { return r.json(); }).then(applyTree).catch(function () {});
+  }
+  refresh();
+
+  // reload.js (also injected into the shell) re-broadcasts each file change here.
+  if (typeof window.CustomEvent === "function") {
+    window.addEventListener("htmlovermd:change", refresh);
+  }
 
   if (iframe) iframe.addEventListener("load", syncFromIframe);
 })();

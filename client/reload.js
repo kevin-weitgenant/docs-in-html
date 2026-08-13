@@ -16,6 +16,9 @@
   es.onmessage = function (e) {
     var changed;
     try { changed = JSON.parse(e.data).path; } catch (_) { return; }
+    // Re-broadcast every change as a window event so other clients in this page
+    // (e.g. the sidebar) can react — even when this page itself won't reload.
+    try { window.dispatchEvent(new CustomEvent("htmlovermd:change", { detail: { path: changed } })); } catch (_) {}
     if (changed && shouldReload(changed)) location.reload();
   };
 })();
