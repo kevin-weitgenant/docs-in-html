@@ -1,0 +1,37 @@
+{
+  "name": "htmlovermd",
+  "version": "0.1.0",
+  "description": "Navigate folders of HTML docs with an auto sidebar tree, live reload, and Mermaid pan/zoom. HTML over Markdown — zero build.",
+  "keywords": [
+    "docs",
+    "documentation",
+    "html",
+    "mermaid",
+    "live-reload",
+    "dev-server",
+    "static-server",
+    "zero-build",
+    "mkdocs-alternative",
+    "sidebar"
+  ],
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "htmlovermd": "./serve.ts"
+  },
+  "main": "./serve.ts",
+  "files": [
+    "serve.ts",
+    "reload.ts",
+    "manifest.ts",
+    "shell.ts",
+    "init.ts",
+    "client/"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node serve.ts ."
+  }
+}
