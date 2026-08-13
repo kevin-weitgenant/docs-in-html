@@ -17,21 +17,21 @@
   "license": "MIT",
   "type": "commonjs",
   "bin": {
-    "htmlovermd": "./serve.ts"
+    "htmlovermd": "./serve.js"
   },
-  "main": "./serve.ts",
+  "main": "./serve.js",
   "files": [
-    "serve.ts",
-    "reload.ts",
-    "manifest.ts",
-    "shell.ts",
-    "init.ts",
+    "serve.js",
+    "reload.js",
+    "manifest.js",
+    "shell.js",
+    "init.js",
     "client/"
   ],
   "engines": {
-    "node": ">=22.18"
+    "node": ">=18"
   },
   "scripts": {
-    "start": "node serve.ts ."
+    "start": "node serve.js ."
   }
 }

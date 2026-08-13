@@ -1,15 +1,11 @@
 // Build a tree of the docs folder: folders (collapsible) + .html files.
 // Hides dotfiles, _-prefixed names, and index.html (the shell). Empty folders are dropped.
 
-const fs = require("node:fs") as typeof import("node:fs");
-const path = require("node:path") as typeof import("node:path");
-
-interface DocNode { type: "doc"; name: string; path: string }
-interface FolderNode { type: "folder"; name: string; path: string; children: TreeNode[] }
-type TreeNode = DocNode | FolderNode;
+const fs = require("node:fs");
+const path = require("node:path");
 
 // "auth-service.html" → "Auth Service"; "backend" → "Backend"
-function humanize(name: string): string {
+function humanize(name) {
   return name
     .replace(/\.[^.]+$/, "")
     .replace(/[-_]+/g, " ")
@@ -17,14 +13,14 @@ function humanize(name: string): string {
     .trim();
 }
 
-function buildTree(root: string): TreeNode[] {
-  function walk(dir: string, rel: string): TreeNode[] {
-    let entries: import("node:fs").Dirent[];
+function buildTree(root) {
+  function walk(dir, rel) {
+    let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
     entries.sort((a, b) =>
       a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1
     );
-    const nodes: TreeNode[] = [];
+    const nodes = [];
     for (const e of entries) {
       if (e.name.startsWith(".") || e.name.startsWith("_")) continue; // hidden / template
       const childRel = rel ? rel + "/" + e.name : e.name;

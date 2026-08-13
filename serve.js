@@ -5,20 +5,17 @@
 //   htmlovermd [dir] [--port N] [--no-open]   serve a folder (default: current dir)
 //   htmlovermd init [dir]                     scaffold a starter index.html
 
-import type { IncomingMessage, ServerResponse, OutgoingHttpHeaders } from "node:http";
-import type { Stats } from "node:fs";
-
-const http = require("node:http") as typeof import("node:http");
-const fs = require("node:fs") as typeof import("node:fs");
-const path = require("node:path") as typeof import("node:path");
-const { exec } = require("node:child_process") as typeof import("node:child_process");
-const { createReload } = require("./reload.ts") as typeof import("./reload");
-const { buildTree } = require("./manifest.ts") as typeof import("./manifest");
-const { SHELL } = require("./shell.ts") as typeof import("./shell");
+const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+const { exec } = require("node:child_process");
+const { createReload } = require("./reload.js");
+const { buildTree } = require("./manifest.js");
+const { SHELL } = require("./shell.js");
 
 const CLIENT_DIR = path.join(__dirname, "client");
 
-const MIME: Record<string, string> = {
+const MIME = {
   ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -28,9 +25,7 @@ const MIME: Record<string, string> = {
   ".map": "application/json; charset=utf-8",
 };
 
-type Err = NodeJS.ErrnoException | null;
-
-function send(res: ServerResponse, status: number, body: string | Buffer, headers: OutgoingHttpHeaders = {}): void {
+function send(res, status, body, headers = {}) {
   res.writeHead(status, headers);
   res.end(body);
 }
@@ -39,8 +34,8 @@ function send(res: ServerResponse, status: number, body: string | Buffer, header
 //  - reload client (always)
 //  - nav client (only the shell — a page with #docList)
 //  - mermaid-zoom (only docs with .mermaid blocks that don't already have pan/zoom)
-function injectScripts(html: string): string {
-  const tags: string[] = [`<script src="/__docs__/reload.js"></script>`];
+function injectScripts(html) {
+  const tags = [`<script src="/__docs__/reload.js"></script>`];
   if (/\bid\s*=\s*["']docList["']/.test(html)) tags.push(`<script src="/__docs__/nav.js"></script>`);
   if (/\bclass\s*=\s*["'][^"']*\bmermaid\b/.test(html) && !/mermaid-zoom|svg-pan-zoom/.test(html)) {
     tags.push(`<script src="/__docs__/mermaid-zoom.js" defer></script>`);
@@ -49,12 +44,12 @@ function injectScripts(html: string): string {
   return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, block + "$&") : html + block;
 }
 
-function serveFile(filePath: string, res: ServerResponse): void {
-  fs.stat(filePath, (err: Err, stat: Stats) => {
+function serveFile(filePath, res) {
+  fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) return send(res, 404, "404 Not Found");
     const ext = path.extname(filePath).toLowerCase();
     const type = MIME[ext] || "application/octet-stream";
-    fs.readFile(filePath, (e: Err, data: Buffer) => {
+    fs.readFile(filePath, (e, data) => {
       if (e) return send(res, 500, "500 Internal Server Error");
       const body = ext === ".html" ? injectScripts(data.toString("utf8")) : data;
       send(res, 200, body, { "Content-Type": type });
@@ -63,7 +58,7 @@ function serveFile(filePath: string, res: ServerResponse): void {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────
-function help(): void {
+function help() {
   console.log(`htmlovermd — zero-build dev server for HTML docs.
 
 Usage:
@@ -81,7 +76,7 @@ const args = process.argv.slice(2);
 let dir = ".";
 let port = Number(process.env.PORT) || 8000;
 let doOpen = true;
-let mode: "serve" | "init" = "serve";
+let mode = "serve";
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "-h" || a === "--help") { help(); process.exit(0); }
@@ -95,14 +90,14 @@ for (let i = 0; i < args.length; i++) {
 const ROOT = path.resolve(dir);
 
 if (mode === "init") {
-  (require("./init.ts") as typeof import("./init")).init(ROOT);
+  require("./init.js").init(ROOT);
   process.exit(0);
 }
 
 // ── server ───────────────────────────────────────────────────────────────
 const reload = createReload(ROOT);
 
-const server = http.createServer((req: IncomingMessage, res: ServerResponse) => {
+const server = http.createServer((req, res) => {
   if (reload.handle(req, res)) return; // SSE channel
 
   const raw = (req.url || "/").split("?")[0];

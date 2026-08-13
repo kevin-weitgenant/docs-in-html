@@ -1,10 +1,10 @@
 // `htmlovermd init [dir]` — scaffold a starter index.html (the shell) so you can customize it.
 
-const fs = require("node:fs") as typeof import("node:fs");
-const path = require("node:path") as typeof import("node:path");
-const { SHELL } = require("./shell.ts") as typeof import("./shell");
+const fs = require("node:fs");
+const path = require("node:path");
+const { SHELL } = require("./shell.js");
 
-function init(dir: string): void {
+function init(dir) {
   fs.mkdirSync(dir, { recursive: true });
   const idx = path.join(dir, "index.html");
   if (fs.existsSync(idx)) {

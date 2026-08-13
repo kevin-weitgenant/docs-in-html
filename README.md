@@ -16,7 +16,7 @@ exactly that, and adds Mermaid pan/zoom on top.
 npm install -g htmlovermd     # or just: npx htmlovermd ./my-docs
 ```
 
-Requires Node ≥ 22.18 (native TypeScript stripping — no build step).
+Requires Node ≥ 18.
 
 ## Use
 

@@ -1,26 +1,20 @@
 // Live reload: SSE channel (/__reload__) + recursive file watcher.
 // createReload(root) → { handle, close }. handle() claims the SSE route.
 
-import type { IncomingMessage, ServerResponse } from "node:http";
-const fs = require("node:fs") as typeof import("node:fs");
+const fs = require("node:fs");
 
-interface ReloadFeature {
-  handle(req: IncomingMessage, res: ServerResponse): boolean; // true if this was the SSE route
-  close(): void;
-}
+function createReload(root) {
+  const clients = new Set();
 
-function createReload(root: string): ReloadFeature {
-  const clients: Set<ServerResponse> = new Set();
-
-  function broadcast(relPath: string): void {
+  function broadcast(relPath) {
     if (!clients.size) return;
     const msg = `data: ${JSON.stringify({ path: relPath })}\n\n`;
     for (const res of clients) res.write(msg);
   }
 
   // Debounce per file: Windows fires several events for one save.
-  const timers: Record<string, ReturnType<typeof setTimeout>> = {};
-  let watcher: fs.FSWatcher | null = null;
+  const timers = {};
+  let watcher = null;
   try {
     watcher = fs.watch(root, { recursive: true }, (_e, file) => {
       if (!file) return;
