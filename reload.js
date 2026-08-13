@@ -24,7 +24,7 @@ function createReload(root) {
     });
     watcher.on("error", () => {});
   } catch {
-    console.warn("[docsinhtml] fs.watch unavailable — hot reload disabled (static serving still works).");
+    console.warn("[docs-in-html] fs.watch unavailable — hot reload disabled (static serving still works).");
   }
 
   return {

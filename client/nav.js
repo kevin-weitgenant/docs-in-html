@@ -1,4 +1,4 @@
-// docsinhtml nav client — builds the folder-tree sidebar from /__manifest__,
+// docs-in-html nav client — builds the folder-tree sidebar from /__manifest__,
 // handles doc switching + active highlighting + collapse memory.
 // Loaded only into the shell (a page with #docList). No-op otherwise,
 // so the static <ul> fallback still works without the server.
@@ -38,11 +38,11 @@
   function setSidebar(hidden) {
     if (!navAside) return;
     navAside.classList.toggle("dl-collapsed", hidden);
-    try { localStorage.setItem("docsinhtml:sidebar", hidden ? "1" : "0"); } catch (e) {}
+    try { localStorage.setItem("docs-in-html:sidebar", hidden ? "1" : "0"); } catch (e) {}
     renderToggle();
   }
   var startHidden = false;
-  try { startHidden = localStorage.getItem("docsinhtml:sidebar") === "1"; } catch (e) {}
+  try { startHidden = localStorage.getItem("docs-in-html:sidebar") === "1"; } catch (e) {}
   var header = document.querySelector("header");
   if (header) header.appendChild(toggle);
   else { toggle.className = "dl-floating"; document.body.appendChild(toggle); }
@@ -51,7 +51,7 @@
   });
   setSidebar(startHidden);
 
-  var STORE = "docsinhtml:collapsed";
+  var STORE = "docs-in-html:collapsed";
   var collapsed = {};
   try { collapsed = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (e) { collapsed = {}; }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(collapsed)); } catch (e) {} }
@@ -180,7 +180,7 @@
 
   // reload.js (also injected into the shell) re-broadcasts each file change here.
   if (typeof window.CustomEvent === "function") {
-    window.addEventListener("docsinhtml:change", refresh);
+    window.addEventListener("docs-in-html:change", refresh);
   }
 
   if (iframe) iframe.addEventListener("load", syncFromIframe);

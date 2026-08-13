@@ -1,5 +1,5 @@
 {
-  "name": "docsinhtml",
+  "name": "docs-in-html",
   "version": "0.2.0",
   "description": "Navigate folders of HTML docs with an auto sidebar tree, live reload, and Mermaid/SVG pan/zoom. HTML over Markdown — zero build.",
   "keywords": [
@@ -16,17 +16,17 @@
   ],
   "license": "MIT",
   "author": "Kevin Weitgenant",
-  "homepage": "https://github.com/kevin-weitgenant/docsinhtml#readme",
+  "homepage": "https://github.com/kevin-weitgenant/docs-in-html#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kevin-weitgenant/docsinhtml.git"
+    "url": "git+https://github.com/kevin-weitgenant/docs-in-html.git"
   },
   "bugs": {
-    "url": "https://github.com/kevin-weitgenant/docsinhtml/issues"
+    "url": "https://github.com/kevin-weitgenant/docs-in-html/issues"
   },
   "type": "commonjs",
   "bin": {
-    "docsinhtml": "./serve.js"
+    "docs-in-html": "./serve.js"
   },
   "main": "./serve.js",
   "files": [

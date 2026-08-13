@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// docsinhtml — zero-build dev server for folders of HTML docs.
+// docs-in-html — zero-build dev server for folders of HTML docs.
 // Auto sidebar tree (from your folders) + live reload + Mermaid pan/zoom.
 //
-//   docsinhtml [dir] [--port N] [--no-open]   serve a folder (default: current dir)
-//   docsinhtml init [dir]                     scaffold a starter index.html
+//   docs-in-html [dir] [--port N] [--no-open]   serve a folder (default: current dir)
+//   docs-in-html init [dir]                     scaffold a starter index.html
 
 const http = require("node:http");
 const fs = require("node:fs");
@@ -64,11 +64,11 @@ function serveFile(filePath, res) {
 
 // ── CLI ──────────────────────────────────────────────────────────────────
 function help() {
-  console.log(`docsinhtml — zero-build dev server for HTML docs.
+  console.log(`docs-in-html — zero-build dev server for HTML docs.
 
 Usage:
-  docsinhtml [dir] [--port N] [--no-open]   serve a folder (default: current dir)
-  docsinhtml init [dir]                     scaffold a starter index.html
+  docs-in-html [dir] [--port N] [--no-open]   serve a folder (default: current dir)
+  docs-in-html init [dir]                     scaffold a starter index.html
 
 Options:
   -p, --port N     port (default 8000, or $PORT)
@@ -133,7 +133,7 @@ const server = http.createServer((req, res) => {
 server.on("close", () => reload.close());
 server.listen(port, () => {
   const url = `http://localhost:${port}`;
-  console.log(`docsinhtml · serving ${ROOT}`);
+  console.log(`docs-in-html · serving ${ROOT}`);
   console.log(`  → ${url}`);
   if (doOpen) {
     const cmd = process.platform === "win32" ? `start "" "${url}"`

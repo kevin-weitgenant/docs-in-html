@@ -1,4 +1,4 @@
-// `docsinhtml init [dir]` — scaffold a starter index.html (the shell) so you can customize it.
+// `docs-in-html init [dir]` — scaffold a starter index.html (the shell) so you can customize it.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -13,7 +13,7 @@ function init(dir) {
   }
   fs.writeFileSync(idx, SHELL, "utf8");
   console.log("✓ Created " + idx);
-  console.log("  Drop .html files in this folder, then run:  docsinhtml " + dir);
+  console.log("  Drop .html files in this folder, then run:  docs-in-html " + dir);
 }
 
 module.exports = { init };

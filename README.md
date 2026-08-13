@@ -1,4 +1,4 @@
-# docsinhtml
+# docs-in-html
 
 Navigate folders of **HTML docs** with an auto sidebar, live reload, and
 Mermaid/SVG pan/zoom. HTML over Markdown — zero build, zero dependencies.
@@ -7,13 +7,13 @@ Mermaid/SVG pan/zoom. HTML over Markdown — zero build, zero dependencies.
 
 Docs tools like MkDocs and Docsify are Markdown-first. If you write docs as HTML
 (great for AI-generated, richly-styled content), there's nothing to *render* —
-you only need to **navigate** them. `docsinhtml` is a tiny dev server that does
+you only need to **navigate** them. `docs-in-html` is a tiny dev server that does
 exactly that, and adds Mermaid pan/zoom on top.
 
 ## Install
 
 ```bash
-npm install -g docsinhtml     # or just: npx docsinhtml ./my-docs
+npm install -g docs-in-html     # or just: npx docs-in-html ./my-docs
 ```
 
 Requires Node ≥ 18.
@@ -21,10 +21,10 @@ Requires Node ≥ 18.
 ## Use
 
 ```bash
-docsinhtml ./docs-html              # serve a folder (opens the browser)
-docsinhtml ./docs --port 5000       # custom port
-docsinhtml ./docs --no-open         # don't auto-open
-docsinhtml init ./new-docs          # scaffold a starter index.html
+docs-in-html ./docs-html              # serve a folder (opens the browser)
+docs-in-html ./docs --port 5000       # custom port
+docs-in-html ./docs --no-open         # don't auto-open
+docs-in-html init ./new-docs          # scaffold a starter index.html
 ```
 
 ## Features
