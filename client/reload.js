@@ -1,7 +1,7 @@
-// htmlovermd reload client — injected into every HTML while the dev server runs.
+// docsinhtml reload client — injected into every HTML while the dev server runs.
 // Opens one SSE connection; reloads THIS page only when its own file (or a shared asset) changes.
 (function () {
-  if (window.top === window.self) console.log("[htmlovermd] hot reload connected");
+  if (window.top === window.self) console.log("[docsinhtml] hot reload connected");
 
   // Who am I? root "/" → "index.html", else the path with leading slashes stripped.
   var me = location.pathname.replace(/^\/+/, "") || "index.html";
@@ -18,7 +18,7 @@
     try { changed = JSON.parse(e.data).path; } catch (_) { return; }
     // Re-broadcast every change as a window event so other clients in this page
     // (e.g. the sidebar) can react — even when this page itself won't reload.
-    try { window.dispatchEvent(new CustomEvent("htmlovermd:change", { detail: { path: changed } })); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent("docsinhtml:change", { detail: { path: changed } })); } catch (_) {}
     if (changed && shouldReload(changed)) location.reload();
   };
 })();

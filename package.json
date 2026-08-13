@@ -1,7 +1,7 @@
 {
-  "name": "htmlovermd",
-  "version": "0.1.1",
-  "description": "Navigate folders of HTML docs with an auto sidebar tree, live reload, and Mermaid pan/zoom. HTML over Markdown — zero build.",
+  "name": "docsinhtml",
+  "version": "0.2.0",
+  "description": "Navigate folders of HTML docs with an auto sidebar tree, live reload, and Mermaid/SVG pan/zoom. HTML over Markdown — zero build.",
   "keywords": [
     "docs",
     "documentation",
@@ -16,17 +16,17 @@
   ],
   "license": "MIT",
   "author": "Kevin Weitgenant",
-  "homepage": "https://github.com/kevin-weitgenant/htmlovermd#readme",
+  "homepage": "https://github.com/kevin-weitgenant/docsinhtml#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kevin-weitgenant/htmlovermd.git"
+    "url": "git+https://github.com/kevin-weitgenant/docsinhtml.git"
   },
   "bugs": {
-    "url": "https://github.com/kevin-weitgenant/htmlovermd/issues"
+    "url": "https://github.com/kevin-weitgenant/docsinhtml/issues"
   },
   "type": "commonjs",
   "bin": {
-    "htmlovermd": "./serve.js"
+    "docsinhtml": "./serve.js"
   },
   "main": "./serve.js",
   "files": [

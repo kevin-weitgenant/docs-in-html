@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// htmlovermd — zero-build dev server for folders of HTML docs.
+// docsinhtml — zero-build dev server for folders of HTML docs.
 // Auto sidebar tree (from your folders) + live reload + Mermaid pan/zoom.
 //
-//   htmlovermd [dir] [--port N] [--no-open]   serve a folder (default: current dir)
-//   htmlovermd init [dir]                     scaffold a starter index.html
+//   docsinhtml [dir] [--port N] [--no-open]   serve a folder (default: current dir)
+//   docsinhtml init [dir]                     scaffold a starter index.html
 
 const http = require("node:http");
 const fs = require("node:fs");
@@ -33,11 +33,16 @@ function send(res, status, body, headers = {}) {
 // Splice dev scripts into HTML:
 //  - reload client (always)
 //  - nav client (only the shell — a page with #docList)
-//  - mermaid-zoom (only docs with .mermaid blocks that don't already have pan/zoom)
+//  - mermaid-zoom (docs with Mermaid blocks OR standalone diagram SVGs:
+//    <figure>, or .panzoom/.diagram/.zoomable — that don't already have pan/zoom)
 function injectScripts(html) {
   const tags = [`<script src="/__docs__/reload.js"></script>`];
   if (/\bid\s*=\s*["']docList["']/.test(html)) tags.push(`<script src="/__docs__/nav.js"></script>`);
-  if (/\bclass\s*=\s*["'][^"']*\bmermaid\b/.test(html) && !/mermaid-zoom|svg-pan-zoom/.test(html)) {
+  const wantsZoom =
+    /\bclass\s*=\s*["'][^"']*\bmermaid\b/.test(html) ||
+    /<figure[\s>]/i.test(html) ||
+    /class\s*=\s*["'][^"']*\b(panzoom|diagram|zoomable)\b/i.test(html);
+  if (wantsZoom && !/mermaid-zoom|svg-pan-zoom/.test(html)) {
     tags.push(`<script src="/__docs__/mermaid-zoom.js" defer></script>`);
   }
   const block = tags.join("");
@@ -59,11 +64,11 @@ function serveFile(filePath, res) {
 
 // ── CLI ──────────────────────────────────────────────────────────────────
 function help() {
-  console.log(`htmlovermd — zero-build dev server for HTML docs.
+  console.log(`docsinhtml — zero-build dev server for HTML docs.
 
 Usage:
-  htmlovermd [dir] [--port N] [--no-open]   serve a folder (default: current dir)
-  htmlovermd init [dir]                     scaffold a starter index.html
+  docsinhtml [dir] [--port N] [--no-open]   serve a folder (default: current dir)
+  docsinhtml init [dir]                     scaffold a starter index.html
 
 Options:
   -p, --port N     port (default 8000, or $PORT)
@@ -128,7 +133,7 @@ const server = http.createServer((req, res) => {
 server.on("close", () => reload.close());
 server.listen(port, () => {
   const url = `http://localhost:${port}`;
-  console.log(`htmlovermd · serving ${ROOT}`);
+  console.log(`docsinhtml · serving ${ROOT}`);
   console.log(`  → ${url}`);
   if (doOpen) {
     const cmd = process.platform === "win32" ? `start "" "${url}"`
