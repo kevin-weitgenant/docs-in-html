@@ -15,6 +15,15 @@
     "sidebar"
   ],
   "license": "MIT",
+  "author": "Kevin Weitgenant",
+  "homepage": "https://github.com/kevin-weitgenant/htmlovermd#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevin-weitgenant/htmlovermd.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kevin-weitgenant/htmlovermd/issues"
+  },
   "type": "commonjs",
   "bin": {
     "htmlovermd": "./serve.js"
