@@ -29,13 +29,17 @@ docs-in-html init ./new-docs          # scaffold a starter index.html
 
 ## Features
 
-- **Auto sidebar tree** generated from your folder structure (collapsible, with collapse memory)
+- **Auto sidebar tree** generated from your folder structure (collapsible, with collapse memory,
+  Unicode-friendly — "Integração" stays "Integração")
+- **URL sync** — the address bar always shows the current doc; back/forward and deep
+  links work (F5 on `/docs/foo.html` reopens the shell around that doc)
 - **Live reload** — edit a doc, only that one reloads (sidebar state preserved)
 - **Pan/zoom/lightbox for diagrams** — Mermaid blocks **and** standalone inline SVGs
   (any `<svg>` inside a `<figure>`, or anything marked `.panzoom` / `.diagram` / `.zoomable`).
-  Injected automatically; clicks inside buttons/links are never hijacked.
+  Injected automatically; clicks inside buttons/links are never hijacked. The lightbox
+  has zoom buttons and a **full-screen mode** (works inside the shell's iframe too).
 - Use **your own `index.html`**, or the built-in shell when a folder has none
-- **Hide the sidebar** with the toggle button (state remembered)
+- **Hide the sidebar** with the toggle button, left-aligned in the header (state remembered)
 - Zero dependencies, zero build
 
 ## Authoring
