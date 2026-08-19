@@ -19,21 +19,31 @@
       "#docList a.active{background:#e8f0fe;color:#1f6feb;font-weight:600}" +
       "#dl-toggle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #d9dee6;background:#fff;border-radius:7px;cursor:pointer;font-size:14px;line-height:1;color:#1f2329}" +
       "#dl-toggle:hover{background:#f6f7f9}" +
-      "header #dl-toggle{margin-left:auto}" +
+      "#dl-toggle img{display:block;width:18px;height:18px}" +
+      "#dl-toggle.dl-off{background:#e8f0fe;border-color:#1f6feb}" +
+      "header #dl-toggle{margin-right:8px}" +
       "#dl-toggle.dl-floating{position:fixed;top:10px;left:10px;z-index:200;box-shadow:0 1px 3px rgba(0,0,0,.12)}" +
-      "aside.nav.dl-collapsed{display:none!important}";
+      "aside.dl-collapsed{display:none!important}";
     document.head.appendChild(css);
   }
 
-  // Collapse / hide the whole sidebar (button in the header; state remembered).
+  // Collapse / hide the whole sidebar (button on the left of the header; state remembered).
   var navAside = list.closest("aside");
   var toggle = document.createElement("button");
   toggle.id = "dl-toggle";
   toggle.type = "button";
+  toggle.setAttribute("aria-label", "Toggle sidebar");
+  var icon = document.createElement("img");
+  icon.src = "/__docs__/sidebar-left.svg";
+  icon.alt = "";
+  icon.width = 18;
+  icon.height = 18;
+  toggle.appendChild(icon);
   function renderToggle() {
     var hidden = navAside && navAside.classList.contains("dl-collapsed");
-    toggle.textContent = hidden ? "☰" : "◂";   // ☰ when hidden, ◂ when shown
     toggle.title = hidden ? "Show sidebar" : "Hide sidebar";
+    toggle.setAttribute("aria-pressed", String(!!hidden));
+    toggle.classList.toggle("dl-off", !!hidden);
   }
   function setSidebar(hidden) {
     if (!navAside) return;
@@ -44,7 +54,7 @@
   var startHidden = false;
   try { startHidden = localStorage.getItem("docs-in-html:sidebar") === "1"; } catch (e) {}
   var header = document.querySelector("header");
-  if (header) header.appendChild(toggle);
+  if (header) header.insertBefore(toggle, header.firstChild); // left-aligned, first item in the header
   else { toggle.className = "dl-floating"; document.body.appendChild(toggle); }
   toggle.addEventListener("click", function () {
     setSidebar(!(navAside && navAside.classList.contains("dl-collapsed")));
