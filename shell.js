@@ -26,7 +26,7 @@ main.content iframe{width:100%;height:100%;border:0;background:var(--bg)}
 <header class="top">📚 <span>Docs <span class="dot">·</span> live</span></header>
 <div class="row">
   <aside class="nav"><ul id="docList"></ul></aside>
-  <main class="content"><iframe name="conteudo" id="conteudo" title="Document"></iframe></main>
+  <main class="content"><iframe name="conteudo" id="conteudo" title="Document" allowfullscreen></iframe></main>
 </div>
 </body>
 </html>`;

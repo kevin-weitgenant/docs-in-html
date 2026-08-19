@@ -7,7 +7,8 @@
  *
  * - Carrega sozinho a lib svg-pan-zoom (a mesma do mkdocs-material) via CDN.
  * - Clique no diagrama abre um lightbox: arraste = pan, scroll = zoom,
- *   botões + / − / ajustar. ESC ou clique fora fecha.
+ *   botões + / − / ajustar / tela cheia. ESC ou clique fora fecha
+ *   (ESC em tela cheia primeiro sai da tela cheia, depois fecha).
  * - O que vira zoomable:  <figure>  ·  .mermaid  ·  .panzoom / .diagram / .zoomable
  *     (qualquer SVG dentro desses contêineres, ou um <svg> com uma dessas classes).
  * - Nunca intercepta SVGs dentro de elementos interativos (button, a, [role=button],
@@ -61,14 +62,18 @@
       "  background:#fff; border-radius:12px; overflow:hidden;",
       "  box-shadow:0 18px 60px rgba(0,0,0,.35); }",
       ".mz-stage svg { display:block; width:100% !important; height:100% !important; max-width:none !important; }",
-      ".mz-close, .mz-toolbar button { background:#fff; border:1px solid #d9dee6;",
+      // tela cheia: stage ocupa a tela toda, sem moldura
+      ".mz-stage:fullscreen { width:100vw; height:100vh; max-width:none; border-radius:0; }",
+      ".mz-stage:-webkit-full-screen { width:100vw; height:100vh; max-width:none; border-radius:0; }",
+      ".mz-close, .mz-fs, .mz-toolbar button { background:#fff; border:1px solid #d9dee6;",
       "  border-radius:7px; cursor:pointer; color:#1f2329; line-height:1;",
       "  box-shadow:0 1px 3px rgba(0,0,0,.12); }",
-      ".mz-close { position:absolute; top:12px; right:14px; z-index:6;",
-      "  width:34px; height:34px; font-size:1.2rem; }",
+      ".mz-corner { position:absolute; top:12px; right:14px; z-index:6; display:flex; gap:6px; }",
+      ".mz-close { width:34px; height:34px; font-size:1.2rem; }",
+      ".mz-fs { width:34px; height:34px; font-size:1.05rem; }",
       ".mz-toolbar { position:absolute; bottom:12px; right:14px; z-index:6; display:flex; gap:6px; }",
       ".mz-toolbar button { width:36px; height:36px; font-size:1.05rem; }",
-      ".mz-close:hover, .mz-toolbar button:hover { background:#f6f7f9; }",
+      ".mz-close:hover, .mz-fs:hover, .mz-toolbar button:hover { background:#f6f7f9; }",
     ].join("\n");
     var st = document.createElement("style");
     st.id = "mz-style";
@@ -100,7 +105,10 @@
     o.hidden = true;
     o.innerHTML =
       '<div class="mz-stage">' +
+      '<div class="mz-corner">' +
+      '<button class="mz-fs" type="button" aria-label="Tela cheia" title="Tela cheia">&#x26F6;</button>' +
       '<button class="mz-close" type="button" aria-label="Fechar">&times;</button>' +
+      '</div>' +
       '<div class="mz-toolbar">' +
       '<button type="button" data-z="in" title="Ampliar">+</button>' +
       '<button type="button" data-z="out" title="Reduzir">&minus;</button>' +
@@ -110,6 +118,11 @@
     stage = o.querySelector(".mz-stage");
 
     o.querySelector(".mz-close").addEventListener("click", closeModal);
+    fsBtn = o.querySelector(".mz-fs");
+    fsBtn.addEventListener("click", toggleFullscreen);
+    ["fullscreenchange", "webkitfullscreenchange"].forEach(function (ev) {
+      document.addEventListener(ev, onFsChange);
+    });
     o.addEventListener("mousedown", function (e) { if (e.target === o) closeModal(); });
     o.querySelector(".mz-toolbar").addEventListener("click", function (e) {
       var z = e.target.getAttribute("data-z");
@@ -118,7 +131,32 @@
       else if (z === "out") pz.zoomOut();
       else { pz.resetZoom(); pz.center(); }
     });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      if (fsElement()) return; // ESC em tela cheia: só sai da tela cheia, não fecha
+      closeModal();
+    });
+  }
+
+  // ── tela cheia ───────────────────────────────────────────────────────
+  var fsBtn = null;
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function toggleFullscreen() {
+    if (fsElement()) {
+      var exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+    } else {
+      var req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+      if (req) req.call(stage); // sem Fullscreen API: segue no lightbox grande
+    }
+  }
+  function onFsChange() {
+    var fs = !!fsElement();
+    if (fsBtn) {
+      fsBtn.title = fs ? "Sair da tela cheia" : "Tela cheia";
+      fsBtn.setAttribute("aria-label", fsBtn.title);
+    }
+    requestAnimationFrame(refit);
   }
 
   function openModal(srcSvg) {
@@ -162,19 +200,25 @@
   function closeModal() {
     var o = document.getElementById("mz-overlay");
     if (!o || o.hidden) return;
+    if (fsElement()) { // sai da tela cheia antes de esconder
+      var exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+    }
     o.hidden = true;
     document.body.style.overflow = "";
     if (pz) { try { pz.destroy(); } catch (e) {} pz = null; }
     if (clone) { clone.remove(); clone = null; }
   }
 
-  window.addEventListener("resize", function () {
+  // redimensiona o pan/zoom quando o stage muda de tamanho (resize / tela cheia)
+  function refit() {
     if (!pz || !stage || !clone) return;
     var r = stage.getBoundingClientRect();
     clone.setAttribute("width", r.width);
     clone.setAttribute("height", r.height);
     try { pz.resize(); pz.fit(); pz.center(); } catch (e) {}
-  });
+  }
+  window.addEventListener("resize", refit);
 
   // ── boot: event delegation (sobrevive a qualquer reescrita do Mermaid) ────
   injectCSS();

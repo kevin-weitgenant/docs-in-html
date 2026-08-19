@@ -7,6 +7,10 @@
   var iframe = document.querySelector("iframe");
   if (!list) return;
 
+  // Fullscreen (ex.: botão tela cheia do mermaid-zoom) exige isto no iframe —
+  // shells customizados costumam omitir, então garantimos aqui.
+  if (iframe) { try { iframe.allowFullscreen = true; } catch (e) {} }
+
   if (!document.getElementById("dl-style")) {
     var css = document.createElement("style");
     css.id = "dl-style";
