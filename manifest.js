@@ -5,11 +5,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // "auth-service.html" → "Auth Service"; "backend" → "Backend"
+// Capitalize the first letter of each word. Per-word with String#toUpperCase
+// (Unicode-aware) — NOT /\b\w/ which is ASCII-only and mangles "Integração" → "IntegraçãO".
 function humanize(name) {
   return name
     .replace(/\.[^.]+$/, "")
     .replace(/[-_]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/^./u, (c) => c.toUpperCase()))
+    .join(" ")
     .trim();
 }
 
