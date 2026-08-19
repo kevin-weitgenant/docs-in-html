@@ -62,6 +62,24 @@ function serveFile(filePath, res) {
   });
 }
 
+// The shell page: the user's index.html when present, otherwise the built-in one.
+// Can be served at a deep URL (e.g. /docs/foo.html) so that a top-level visit
+// there reopens the shell around the doc — <base href="/"> keeps any relative
+// asset references in a custom index.html resolving from the root.
+function serveShell(res) {
+  const idx = path.join(ROOT, "index.html");
+  let html =
+    fs.existsSync(idx) && fs.statSync(idx).isFile()
+      ? fs.readFileSync(idx, "utf8")
+      : SHELL;
+  if (!/<base\s/i.test(html)) {
+    html = /<head[^>]*>/i.test(html)
+      ? html.replace(/<head[^>]*>/i, (m) => m + '\n<base href="/">')
+      : '<base href="/">\n' + html;
+  }
+  send(res, 200, injectScripts(html), { "Content-Type": "text/html; charset=utf-8" });
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────
 function help() {
   console.log(`docs-in-html — zero-build dev server for HTML docs.
@@ -119,14 +137,22 @@ const server = http.createServer((req, res) => {
   }
 
   let urlPath = decodeURIComponent(raw);
-  if (urlPath === "/") {
-    const idx = path.join(ROOT, "index.html");
-    if (fs.existsSync(idx) && fs.statSync(idx).isFile()) return serveFile(idx, res);
-    return send(res, 200, injectScripts(SHELL), { "Content-Type": "text/html; charset=utf-8" });
-  }
+  if (urlPath === "/") return serveShell(res);
 
   const filePath = path.join(ROOT, urlPath);
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) return send(res, 403, "403 Forbidden");
+
+  // Deep URL: a top-level navigation to a doc (address bar, F5, target="_top")
+  // gets the shell wrapped around it. The iframe's own request carries
+  // Sec-Fetch-Dest: iframe and still gets the bare document — no recursion.
+  // Requests without the header (curl, old browsers) get the bare doc too.
+  if (
+    /\.html?$/i.test(urlPath) &&
+    req.headers["sec-fetch-dest"] === "document" &&
+    path.resolve(filePath) !== path.resolve(path.join(ROOT, "index.html"))
+  ) {
+    return serveShell(res);
+  }
   serveFile(filePath, res);
 });
 

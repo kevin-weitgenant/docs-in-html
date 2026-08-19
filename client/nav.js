@@ -32,7 +32,7 @@
   toggle.type = "button";
   function renderToggle() {
     var hidden = navAside && navAside.classList.contains("dl-collapsed");
-    toggle.textContent = hidden ? "\u2630" : "\u25C2";   // ☰ when hidden, ◂ when shown
+    toggle.textContent = hidden ? "☰" : "◂";   // ☰ when hidden, ◂ when shown
     toggle.title = hidden ? "Show sidebar" : "Hide sidebar";
   }
   function setSidebar(hidden) {
@@ -100,9 +100,15 @@
     list.appendChild(frag);
   }
 
-  function go(path) {
+  var skipSyncPush = false; // suppress URL push when go() itself caused the iframe load
+  function go(path, push) {
+    skipSyncPush = true;
     if (iframe) iframe.src = "/" + path;
     setActive(path);
+    try {
+      if (push === false) history.replaceState({ docsPath: path }, "", "/" + path);
+      else history.pushState({ docsPath: path }, "", "/" + path);
+    } catch (e) {}
   }
 
   function setActive(path) {
@@ -133,7 +139,13 @@
   function syncFromIframe() {
     try {
       var p = iframe.contentWindow.location.pathname.replace(/^\/+/, "");
-      if (p) setActive(p);
+      if (!p) return;
+      setActive(p);
+      // the doc navigated itself (link inside the iframe) → keep the URL in sync
+      if (!skipSyncPush && "/" + p !== location.pathname) {
+        try { history.pushState({ docsPath: p }, "", "/" + p); } catch (e) {}
+      }
+      skipSyncPush = false;
     } catch (e) {}
   }
 
@@ -168,7 +180,19 @@
     var scroller = navAside || list;
     var scrollTop = scroller.scrollTop;
     build(tree);
-    if (iframe && !iframe.getAttribute("src")) { var f = firstDoc(tree); if (f) go(f); }
+    if (iframe && !iframe.getAttribute("src")) {
+      // deep link: if the current URL points at a doc in the tree, open it
+      var initial = location.pathname.replace(/^\/+/, "");
+      var f = null;
+      if (initial) {
+        var links = list.querySelectorAll("a");
+        for (var i = 0; i < links.length; i++) {
+          if (links[i].dataset.path === initial) { f = initial; break; }
+        }
+      }
+      if (!f) f = firstDoc(tree);
+      if (f) go(f, false);
+    }
     syncFromIframe();
     scroller.scrollTop = scrollTop;             // preserve sidebar scroll across rebuild
   }
@@ -184,4 +208,10 @@
   }
 
   if (iframe) iframe.addEventListener("load", syncFromIframe);
+
+  // back/forward buttons
+  window.addEventListener("popstate", function (e) {
+    var p = (e.state && e.state.docsPath) || location.pathname.replace(/^\/+/, "");
+    if (p && iframe) go(p, false);
+  });
 })();
