@@ -27,7 +27,12 @@
       "#dl-toggle.dl-off{background:#e8f0fe;border-color:#1f6feb}" +
       "header #dl-toggle{margin-right:8px}" +
       "#dl-toggle.dl-floating{position:fixed;top:10px;left:10px;z-index:200;box-shadow:0 1px 3px rgba(0,0,0,.12)}" +
-      "aside.dl-collapsed{display:none!important}";
+      "aside.dl-collapsed{display:none!important}" +
+      "#docList li{position:relative}" +
+      ".dl-del{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:none;background:transparent;border-radius:5px;cursor:pointer;color:#9aa4b2;font-size:14px;line-height:1}" +
+      ".dl-del:hover{background:#fee2e2;color:#dc2626}" +
+      "#docList li:hover>.dl-del,#docList .dl-del:focus{display:inline-flex}" +
+      ".dl-del.dl-confirm{display:inline-flex;background:#fee2e2;color:#dc2626;font-weight:700}";
     document.head.appendChild(css);
   }
 
@@ -104,7 +109,54 @@
     a.textContent = n.name;
     a.addEventListener("click", function (e) { e.preventDefault(); go(n.path); });
     li2.appendChild(a);
+    li2.appendChild(makeDeleteButton(n.path));
     return li2;
+  }
+
+  // Per-doc delete button (visible on hover). First click arms it (turns red),
+  // second click within 3s actually deletes the file via POST /__delete__.
+  function makeDeleteButton(docPath) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dl-del";
+    btn.title = "Delete " + docPath;
+    btn.setAttribute("aria-label", "Delete " + docPath);
+    btn.textContent = "\u2715";
+    var armed = false, timer = null;
+    function disarm() { armed = false; btn.classList.remove("dl-confirm"); btn.textContent = "\u2715"; btn.title = "Delete " + docPath; }
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!armed) {
+        armed = true;
+        btn.classList.add("dl-confirm");
+        btn.textContent = "?";
+        btn.title = "Click again to delete " + docPath;
+        clearTimeout(timer);
+        timer = setTimeout(disarm, 3000);
+        return;
+      }
+      clearTimeout(timer);
+      fetch("/__delete__", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: docPath })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("delete failed (" + r.status + ")");
+        // if we just deleted the doc being viewed, jump to the first remaining one
+        var cur = location.pathname.replace(/^\/+/, "");
+        return fetch("/__manifest__", { cache: "no-store" }).then(function (r2) { return r2.json(); }).then(function (tree) {
+          if (cur === docPath) {
+            var f = firstDoc(tree);
+            if (f) go(f, false);
+          }
+        });
+      }).then(refresh).catch(function (err) {
+        disarm();
+        alert("Could not delete " + docPath + ":\n" + err.message);
+      });
+    });
+    return btn;
   }
 
   function build(nodes) {

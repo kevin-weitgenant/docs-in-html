@@ -129,6 +129,24 @@ const server = http.createServer((req, res) => {
     return send(res, 200, JSON.stringify(buildTree(ROOT)), { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   }
 
+  // Delete a doc from the sidebar (POST /__delete__ with JSON {path}).
+  if (req.method === "POST" && raw === "/__delete__") {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on("end", () => {
+      let p;
+      try { p = JSON.parse(body).path; } catch (e) { return send(res, 400, "400 Bad Request"); }
+      if (typeof p !== "string" || !/\.html?$/i.test(p)) return send(res, 400, "400 Bad Request");
+      const filePath = path.resolve(ROOT, p);
+      if (!filePath.startsWith(ROOT + path.sep)) return send(res, 403, "403 Forbidden");
+      fs.unlink(filePath, (err) => {
+        if (err) return send(res, 404, "404 Not Found");
+        send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
+      });
+    });
+    return;
+  }
+
   if (raw.startsWith("/__docs__/")) {
     const f = path.join(CLIENT_DIR, path.normalize(raw.slice("/__docs__/".length)));
     if (f !== CLIENT_DIR && !f.startsWith(CLIENT_DIR + path.sep)) return send(res, 404, "404");
