@@ -23,10 +23,10 @@ function buildTree(root) {
   // Manual drag-order (written by POST /__order__): { "": ["b.html","a.html"], "guides": [...] }
   let order = {};
   try { order = JSON.parse(fs.readFileSync(path.join(root, "_order.json"), "utf8")); } catch {}
-  // Per-entry icons (written by hand or by an AI assistant):
-  // { "guides": "book-open", "guides/deploy.html": "rocket", "dados": "🧮" }
-  // Values are either a Lucide-style name (rendered from the embedded SVG set
-  // in nav.js) or a non-ASCII string, which renders as-is (emoji).
+  // Icons apply to FOLDERS only (per-entry, from _icons.json):
+  // { "guides": "book-open", "dados": "🧮" } — values are either a Lucide-style
+  // name (rendered from the embedded SVG set in nav.js) or a non-ASCII string,
+  // which renders as-is (emoji). Doc entries are ignored.
   let icons = {};
   try { icons = JSON.parse(fs.readFileSync(path.join(root, "_icons.json"), "utf8")); } catch {}
   const sortByOrder = (rel, entries) => {
@@ -54,9 +54,7 @@ function buildTree(root) {
         nodes.push(node);
       } else if (e.isFile() && /\.html?$/i.test(e.name)) {
         if (e.name.toLowerCase() === "index.html") continue; // the shell itself
-        const node = { type: "doc", name: humanize(e.name), path: childRel };
-        if (typeof icons[childRel] === "string") node.icon = icons[childRel];
-        nodes.push(node);
+        nodes.push({ type: "doc", name: humanize(e.name), path: childRel });
       }
     }
     return nodes;

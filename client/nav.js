@@ -633,8 +633,6 @@
     a.href = "/" + n.path;
     a.setAttribute("draggable", "false"); // links drag natively — kills our mousemove drag
     a.dataset.path = n.path;
-    var dico = iconEl(n.icon, false);
-    if (dico) a.appendChild(dico);
     var label2 = document.createElement("span");
     label2.className = "dl-label";
     label2.textContent = n.name;
