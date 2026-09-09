@@ -23,6 +23,12 @@ function buildTree(root) {
   // Manual drag-order (written by POST /__order__): { "": ["b.html","a.html"], "guides": [...] }
   let order = {};
   try { order = JSON.parse(fs.readFileSync(path.join(root, "_order.json"), "utf8")); } catch {}
+  // Per-entry icons (written by hand or by an AI assistant):
+  // { "guides": "book-open", "guides/deploy.html": "rocket", "dados": "🧮" }
+  // Values are either a Lucide-style name (rendered from the embedded SVG set
+  // in nav.js) or a non-ASCII string, which renders as-is (emoji).
+  let icons = {};
+  try { icons = JSON.parse(fs.readFileSync(path.join(root, "_icons.json"), "utf8")); } catch {}
   const sortByOrder = (rel, entries) => {
     const ord = order[rel || ""] || [];
     return entries.slice().sort((a, b) => {
@@ -43,10 +49,14 @@ function buildTree(root) {
       const childRel = rel ? rel + "/" + e.name : e.name;
       if (e.isDirectory()) {
         const children = walk(path.join(dir, e.name), childRel);
-        nodes.push({ type: "folder", name: humanize(e.name), path: childRel, children }); // keep even when empty
+        const node = { type: "folder", name: humanize(e.name), path: childRel, children }; // keep even when empty
+        if (typeof icons[childRel] === "string") node.icon = icons[childRel];
+        nodes.push(node);
       } else if (e.isFile() && /\.html?$/i.test(e.name)) {
         if (e.name.toLowerCase() === "index.html") continue; // the shell itself
-        nodes.push({ type: "doc", name: humanize(e.name), path: childRel });
+        const node = { type: "doc", name: humanize(e.name), path: childRel };
+        if (typeof icons[childRel] === "string") node.icon = icons[childRel];
+        nodes.push(node);
       }
     }
     return nodes;

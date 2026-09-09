@@ -17,7 +17,7 @@
     var css = document.createElement("style");
     css.id = "dl-style";
     css.textContent =
-      ".dl-folder{position:relative;font-weight:600;padding:7px 8px;cursor:pointer;border-radius:6px;user-select:none;color:#1f2329}" +
+      ".dl-folder{position:relative;display:flex;align-items:center;gap:6px;font-weight:600;padding:7px 8px;cursor:pointer;border-radius:6px;user-select:none;color:#1f2329}" +
       ".dl-folder:hover{background:#f6f7f9}" +
       "#docList .dl-nested{list-style:none;margin:2px 0 4px 8px;padding-left:14px;border-left:1px solid #eef1f5}" +
       "#docList a{display:block;position:relative;padding:7px 10px;border-radius:6px;text-decoration:none;color:#1f2329;cursor:pointer;font-size:.95rem;-webkit-user-drag:none;user-select:none}" +
@@ -66,7 +66,29 @@
       ".dl-pop button.dl-cur{color:#1f6feb;font-weight:600}" +
       // toast
       ".dl-toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:500;max-width:80vw;padding:10px 18px;border-radius:9px;background:#1f2329;color:#fff;font-size:.9rem;box-shadow:0 4px 14px rgba(0,0,0,.25)}" +
-      ".dl-toast.dl-err{background:#cf222e}";
+      ".dl-toast.dl-err{background:#cf222e}" +
+      // chevron + folder/doc icons live in their own elements (animatable, stylable)
+      ".dl-chev{width:14px;height:14px;flex:none;display:inline-flex;color:#9aa4b2}" +
+      ".dl-chev svg{width:100%;height:100%;transition:transform .22s cubic-bezier(.4,0,.2,1)}" +
+      ".dl-folder.closed .dl-chev svg{transform:rotate(-90deg)}" +
+      ".dl-ico{width:15px;height:15px;flex:none;display:inline-flex;color:#5b6472}" +
+      ".dl-ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}" +
+      ".dl-ico.dl-emoji{font-size:14px;line-height:1.15}" +
+      ".dl-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      // collapse animation — the nested list sits in a .dl-wrap "frame" whose
+      // grid-template-rows interpolates 1fr → 0fr (no height measuring needed)
+      ".dl-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .24s cubic-bezier(.4,0,.2,1)}" +
+      ".dl-folder.closed + .dl-wrap{grid-template-rows:0fr}" +
+      ".dl-wrap>ul{overflow:hidden;min-height:0}" +
+      // variant B — slide & fade (aside.dl-anim-slide)
+      ".dl-anim-slide .dl-wrap>ul{transition:opacity .2s,transform .24s ease}" +
+      ".dl-anim-slide .dl-folder.closed + .dl-wrap>ul{opacity:0;transform:translateX(-8px)}" +
+      // variant C — guide line (aside.dl-anim-guide): the indentation rail
+      // grows with the content and recedes when closing, in accent blue
+      ".dl-anim-guide .dl-wrap{position:relative}" +
+      ".dl-anim-guide .dl-nested{border-left:none;margin-left:8px}" +
+      ".dl-anim-guide .dl-wrap::before{content:\"\";position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:2px;background:#1f6feb;opacity:.45;transition:top .26s ease,opacity .2s}" +
+      ".dl-anim-guide .dl-folder.closed + .dl-wrap::before{top:100%;opacity:0}";
     document.head.appendChild(css);
   }
 
@@ -102,12 +124,91 @@
     toastTimer = setTimeout(function () { t.style.display = "none"; }, 4000);
   }
 
+  // ── icon set (embedded Lucide paths — no React, no network) ───────────────
+  // Curated general-purpose set. Unknown names fall back to the default
+  // folder/file rendering — failing silently and safely.
+  var ICONS = {
+    "folder": '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    "folder-open": '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+    "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
+    "book-open": '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+    "wrench": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    "rocket": '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+    "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+    "settings": '<path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/>',
+    "terminal": '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
+    "code": '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    "git-branch": '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+    "lightbulb": '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+    "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    "shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+    "lock": '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    "key": '<circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+    "globe": '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    "mail": '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+    "calendar": '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+    "chart": '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+    "trending-up": '<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+    "package": '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    "flame": '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    "zap": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "heart": '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+    "star": '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+    "check-circle": '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+    "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    "alert-triangle": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    "home": '<path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2h-3a1 1 0 0 1-1-1v-5a2 2 0 0 0-2-2 2 2 0 0 0-2 2v5a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2z"/>',
+    "image": '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    "music": '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    "video": '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/>',
+    "pen": '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+    "bookmark": '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+    "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    "cloud": '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+    "server": '<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/>',
+    "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    "map-pin": '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+    "compass": '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>',
+    "shopping-cart": '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+    "briefcase": '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'
+  };
+  function chevEl() {
+    var s = document.createElement("span");
+    s.className = "dl-chev";
+    s.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+    return s;
+  }
+  // icon value: a name from ICONS, or any non-ASCII string (emoji → text).
+  // Docs with no icon stay plain; folders fall back to the folder glyph.
+  function iconEl(icon, isFolder) {
+    var name = typeof icon === "string" ? icon.trim() : "";
+    var el;
+    if (name && /[^\u0000-\u007f]/.test(name)) {
+      el = document.createElement("span");
+      el.className = "dl-ico dl-emoji";
+      el.textContent = name;
+      return el;
+    }
+    var d = ICONS[name] || (isFolder ? ICONS.folder : null);
+    if (!d) return null;
+    el = document.createElement("span");
+    el.className = "dl-ico";
+    el.innerHTML = '<svg viewBox="0 0 24 24">' + d + "</svg>";
+    return el;
+  }
+
   var ROOT_INFO = { root: "", sep: "/" }; // absolute path of the served folder + OS separator
   function fetchManifest(cb) {
     fetch("/__manifest__", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (data && Array.isArray(data.tree)) ROOT_INFO = { root: data.root || "", sep: data.sep || "/" };
+        if (data && Array.isArray(data.tree)) {
+          ROOT_INFO = { root: data.root || "", sep: data.sep || "/" };
+          if (data.anim) setAnim(data.anim);
+        }
         cb(data && Array.isArray(data.tree) ? data.tree : data); // old shape: bare array
       })
       .catch(function () {});
@@ -472,10 +573,7 @@
     var heads = list.querySelectorAll(".dl-folder");
     for (var i = 0; i < heads.length; i++) {
       if (heads[i].dataset.path === p) {
-        var lbl = heads[i].querySelector(":scope > .dl-label");
-        if (lbl) lbl.textContent = chevron(p) + "  " + heads[i].dataset.name;
-        var ul = heads[i].parentElement.querySelector(":scope > .dl-nested");
-        if (ul) ul.style.display = "";
+        heads[i].classList.remove("closed"); // CSS does the animating
         break;
       }
     }
@@ -486,27 +584,30 @@
   try { collapsed = JSON.parse(localStorage.getItem("docs-in-html:collapsed") || "{}"); } catch (e) { collapsed = {}; }
   function save() { try { localStorage.setItem("docs-in-html:collapsed", JSON.stringify(collapsed)); } catch (e) {} }
   function isOpen(p) { return !collapsed[p]; }
-  function chevron(p) { return isOpen(p) ? "▾" : "▸"; }
 
   function renderNode(n) {
     if (n.type === "folder") {
       var li = document.createElement("li");
+      var hasKids = n.children && n.children.length;
       var head = document.createElement("div");
-      head.className = "dl-folder";
+      head.className = "dl-folder" + (isOpen(n.path) ? "" : " closed");
       head.dataset.path = n.path;
       head.dataset.name = n.name;
+      var chev = chevEl();
+      if (!hasKids) chev.style.visibility = "hidden"; // nothing to collapse
+      head.appendChild(chev);
+      var ico = iconEl(n.icon, true);
+      if (ico) head.appendChild(ico);
       var label = document.createElement("span");
       label.className = "dl-label";
-      label.textContent = chevron(n.path) + "  " + n.name;
+      label.textContent = n.name;
       head.appendChild(label);
       var entry = { path: n.path, isFolder: true, labelEl: label };
       head.addEventListener("click", function (e) {
         if (head.classList.contains("dl-edit")) return; // renaming
         collapsed[n.path] = isOpen(n.path); // toggle
         save();
-        label.textContent = chevron(n.path) + "  " + head.dataset.name;
-        var ul = li.querySelector(":scope > .dl-nested");
-        if (ul) ul.style.display = isOpen(n.path) ? "" : "none";
+        head.classList.toggle("closed", !isOpen(n.path)); // CSS does the animating
       });
       // double-click a folder name → rename it (desktop convention)
       head.addEventListener("dblclick", function (e) {
@@ -516,12 +617,14 @@
       li.appendChild(head);
       head.appendChild(makeKebab(entry));
       enableDrag(li, entry);
-      if (n.children && n.children.length) {
+      if (hasKids) {
+        var wrap = document.createElement("div"); // animated "frame" around the list
+        wrap.className = "dl-wrap";
         var ul = document.createElement("ul");
         ul.className = "dl-nested";
-        ul.style.display = isOpen(n.path) ? "" : "none";
         n.children.forEach(function (c) { ul.appendChild(renderNode(c)); });
-        li.appendChild(ul);
+        wrap.appendChild(ul);
+        li.appendChild(wrap);
       }
       return li;
     }
@@ -530,8 +633,13 @@
     a.href = "/" + n.path;
     a.setAttribute("draggable", "false"); // links drag natively — kills our mousemove drag
     a.dataset.path = n.path;
-    a.textContent = n.name;
-    var entry2 = { path: n.path, isFolder: false, labelEl: a };
+    var dico = iconEl(n.icon, false);
+    if (dico) a.appendChild(dico);
+    var label2 = document.createElement("span");
+    label2.className = "dl-label";
+    label2.textContent = n.name;
+    a.appendChild(label2);
+    var entry2 = { path: n.path, isFolder: false, labelEl: label2 };
     a.addEventListener("click", function (e) {
       if (a.classList.contains("dl-edit")) return; // renaming
       e.preventDefault(); go(n.path);
@@ -549,6 +657,19 @@
 
   // ── "＋ Folder" toolbar at the top of the side panel ─────────────────────
   var navAside = list.closest("aside") || list.parentElement;
+  // Collapse-animation variant (aside.dl-anim-*): "guide" (C, default),
+  // "slide" (B) or "reveal" (A) — chosen via _config.json → manifest.anim.
+  var ANIMS = { reveal: 1, slide: 1, guide: 1 };
+  var animClass = "dl-anim-guide";
+  if (navAside) navAside.classList.add(animClass);
+  function setAnim(name) {
+    if (!ANIMS[name]) name = "guide";
+    var c = "dl-anim-" + name;
+    if (c === animClass || !navAside) return;
+    navAside.classList.remove(animClass);
+    navAside.classList.add(c);
+    animClass = c;
+  }
   var newbarEl = null;
   if (navAside && !navAside.querySelector(".dl-newbar")) {
     var bar = document.createElement("div");
@@ -651,10 +772,7 @@
         var fp = head.dataset.path;
         if (!isOpen(fp)) {
           collapsed[fp] = false; save();
-          var lbl2 = head.querySelector(":scope > .dl-label");
-          if (lbl2) lbl2.textContent = chevron(fp) + "  " + head.dataset.name;
-          var ul = node.querySelector(":scope > .dl-nested");
-          if (ul) ul.style.display = "";
+          head.classList.remove("closed"); // CSS does the animating
         }
       }
       node = node.parentElement;
@@ -694,7 +812,7 @@
     var out = [];
     (function walk(arr) {
       (arr || []).forEach(function (n) {
-        out.push((n.type === "folder" ? "d:" : "f:") + n.path);
+        out.push((n.type === "folder" ? "d:" : "f:") + n.path + (n.icon ? "|" + n.icon : "")); // icon changes rebuild too
         if (n.type === "folder") walk(n.children);
       });
     })(nodes);

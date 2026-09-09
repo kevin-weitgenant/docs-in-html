@@ -122,6 +122,47 @@ if (mode === "init") {
 }
 
 // ── server ───────────────────────────────────────────────────────────────
+// Sidebar collapse animation variant ("reveal" | "slide" | "guide"), from an
+// optional ROOT/_config.json — e.g. { "sidebarAnim": "slide" }. Default: guide.
+function readAnim() {
+  try {
+    const v = JSON.parse(fs.readFileSync(path.join(ROOT, "_config.json"), "utf8")).sidebarAnim;
+    return ["reveal", "slide", "guide"].includes(v) ? v : "guide";
+  } catch { return "guide"; }
+}
+
+// Keep _icons.json keys in sync when files/folders are renamed/moved/deleted
+// from the sidebar — same idea as the _order.json bookkeeping.
+function loadIcons() {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, "_icons.json"), "utf8")); } catch { return null; }
+}
+function saveIcons(data) {
+  try { fs.writeFileSync(path.join(ROOT, "_icons.json"), JSON.stringify(data, null, 2) + "\n"); } catch {}
+}
+function shiftIcons(from, to) { // rename/move: rewrite the key and descendant keys
+  const data = loadIcons();
+  if (!data) return;
+  let changed = false;
+  const out = {};
+  for (const k of Object.keys(data)) {
+    if (k === from) { out[to] = data[k]; changed = true; }
+    else if (k.startsWith(from + "/")) { out[to + k.slice(from.length)] = data[k]; changed = true; }
+    else out[k] = data[k];
+  }
+  if (changed) saveIcons(out);
+}
+function pruneIcons(rel) { // delete: drop the key and descendant keys
+  const data = loadIcons();
+  if (!data) return;
+  const out = {};
+  let changed = false;
+  for (const k of Object.keys(data)) {
+    if (k === rel || k.startsWith(rel + "/")) { changed = true; continue; }
+    out[k] = data[k];
+  }
+  if (changed) saveIcons(out);
+}
+
 const reload = createReload(ROOT);
 
 const server = http.createServer((req, res) => {
@@ -130,7 +171,7 @@ const server = http.createServer((req, res) => {
   const raw = (req.url || "/").split("?")[0];
 
   if (raw === "/__manifest__") {
-    const body = JSON.stringify({ root: ROOT, sep: path.sep, tree: buildTree(ROOT) });
+    const body = JSON.stringify({ root: ROOT, sep: path.sep, anim: readAnim(), tree: buildTree(ROOT) });
     return send(res, 200, body, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   }
 
@@ -168,12 +209,14 @@ const server = http.createServer((req, res) => {
         if (st.isDirectory()) {
           fs.rmdir(t.abs, (e2) => { // rmdir refuses non-empty folders — safety by design
             if (e2) return send(res, 409, "409 Folder is not empty");
+            pruneIcons(t.rel);
             send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
           });
         } else {
           if (!/\.html?$/i.test(t.rel)) return send(res, 400, "400 Bad Request");
           fs.unlink(t.abs, (e2) => {
             if (e2) return send(res, 404, "404 Not Found");
+            pruneIcons(t.rel);
             send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
           });
         }
@@ -200,6 +243,7 @@ const server = http.createServer((req, res) => {
           if (!e2) return send(res, 409, "409 Target already exists");
           fs.rename(from.abs, to.abs, (e3) => {
             if (e3) return send(res, 500, "500 Rename failed");
+            shiftIcons(from.rel, to.rel);
             send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
           });
         });
