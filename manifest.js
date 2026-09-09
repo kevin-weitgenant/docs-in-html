@@ -1,5 +1,6 @@
 // Build a tree of the docs folder: folders (collapsible) + .html files.
-// Hides dotfiles, _-prefixed names, and index.html (the shell). Empty folders are dropped.
+// Hides dotfiles, _-prefixed names, and index.html (the shell).
+// Empty folders are kept so the sidebar can create/reveal them (mkdir feature).
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -19,19 +20,30 @@ function humanize(name) {
 }
 
 function buildTree(root) {
+  // Manual drag-order (written by POST /__order__): { "": ["b.html","a.html"], "guides": [...] }
+  let order = {};
+  try { order = JSON.parse(fs.readFileSync(path.join(root, "_order.json"), "utf8")); } catch {}
+  const sortByOrder = (rel, entries) => {
+    const ord = order[rel || ""] || [];
+    return entries.slice().sort((a, b) => {
+      const ia = ord.indexOf(a.name), ib = ord.indexOf(b.name);
+      if (ia !== -1 && ib !== -1) return ia - ib;              // both pinned → saved order
+      if (ia !== -1) return -1;                                 // pinned first
+      if (ib !== -1) return 1;
+      return a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1;
+    });
+  };
   function walk(dir, rel) {
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
-    entries.sort((a, b) =>
-      a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1
-    );
+    entries = sortByOrder(rel, entries);
     const nodes = [];
     for (const e of entries) {
       if (e.name.startsWith(".") || e.name.startsWith("_")) continue; // hidden / template
       const childRel = rel ? rel + "/" + e.name : e.name;
       if (e.isDirectory()) {
         const children = walk(path.join(dir, e.name), childRel);
-        if (children.length) nodes.push({ type: "folder", name: humanize(e.name), path: childRel, children });
+        nodes.push({ type: "folder", name: humanize(e.name), path: childRel, children }); // keep even when empty
       } else if (e.isFile() && /\.html?$/i.test(e.name)) {
         if (e.name.toLowerCase() === "index.html") continue; // the shell itself
         nodes.push({ type: "doc", name: humanize(e.name), path: childRel });
