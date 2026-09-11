@@ -72,6 +72,14 @@
     var clone = document.documentElement.cloneNode(true);
     // strip everything the viewer injected (script tags, this toggle, styles)
     clone.querySelectorAll("[data-injected]").forEach(function (el) { el.remove(); });
+    // strip edit-mode attributes: the page is serialized mid-edit, so the body
+    // still carries contenteditable=true (and pre's plaintext-only) — leaving
+    // them in would bake "editable without the toggle" into the file on disk.
+    var body = clone.querySelector("body");
+    if (body) body.removeAttribute("contenteditable");
+    clone.querySelectorAll("pre[contenteditable]").forEach(function (p) {
+      p.removeAttribute("contenteditable");
+    });
     var doctype = document.doctype
       ? "<!DOCTYPE " + document.doctype.name +
         (document.doctype.publicId ? ' PUBLIC "' + document.doctype.publicId + '"' : "") +
