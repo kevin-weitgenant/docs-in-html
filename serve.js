@@ -33,21 +33,26 @@ function send(res, status, body, headers = {}) {
 // Splice dev scripts into HTML:
 //  - reload client (always)
 //  - nav client (only the shell — a page with #docList)
+//  - edit client (every doc EXCEPT the shell — inline WYSIWYG editing)
 //  - mermaid-zoom (docs with Mermaid blocks OR standalone diagram SVGs:
 //    <figure>, or .panzoom/.diagram/.zoomable — that don't already have pan/zoom)
 // Detection is tag-context only: a page that merely *mentions* "id=\"docList\""
 // or "mermaid-zoom" in prose (e.g. docs about this very package) must not
 // be mistaken for a shell or for a page that ships its own pan/zoom.
+// Every injected tag carries data-injected: the editor strips them before
+// saving the page back to disk via /__save__.
 function injectScripts(html) {
-  const tags = [`<script src="/__docs__/reload.js"></script>`];
-  if (/<[^>]+\bid\s*=\s*["']docList["']/i.test(html)) tags.push(`<script src="/__docs__/nav.js"></script>`);
+  const isShell = /<[^>]+\bid\s*=\s*["']docList["']/i.test(html);
+  const tags = [`<script src="/__docs__/reload.js" data-injected></script>`];
+  if (isShell) tags.push(`<script src="/__docs__/nav.js" data-injected></script>`);
+  else tags.push(`<script src="/__docs__/edit.js" data-injected defer></script>`);
   const wantsZoom =
     /\bclass\s*=\s*["'][^"']*\bmermaid\b/.test(html) ||
     /<figure[\s>]/i.test(html) ||
     /class\s*=\s*["'][^"']*\b(panzoom|diagram|zoomable)\b/i.test(html);
   const hasOwnZoom = /<script[^>]+src\s*=\s*["'][^"']*(?:mermaid-zoom|svg-pan-zoom)/i.test(html);
   if (wantsZoom && !hasOwnZoom) {
-    tags.push(`<script src="/__docs__/mermaid-zoom.js" defer></script>`);
+    tags.push(`<script src="/__docs__/mermaid-zoom.js" data-injected defer></script>`);
   }
   const block = tags.join("");
   return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, block + "$&") : html + block;
@@ -267,6 +272,21 @@ const server = http.createServer((req, res) => {
         });
       });
     });
+  }
+
+  // Save an inline-edited doc (POST /__save__ {path, html}) — the editor client
+  // serializes the page minus its data-injected tags; we validate the path with
+  // the same guards as the other endpoints and write the file back in place.
+  if (req.method === "POST" && raw === "/__save__") {
+    return readJsonBody(req, (j) => {
+      const t = resolveIn(j && j.path);
+      if (!t || !/\.html?$/i.test(t.rel) || typeof j.html !== "string")
+        return send(res, 400, "400 Bad Request");
+      fs.writeFile(t.abs, j.html, "utf8", (err) => {
+        if (err) return send(res, 500, "500 write failed");
+        send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
+      });
+    }, 10 * 1024 * 1024); // whole-page HTML — allow up to 10 MB
   }
 
   // Persist a manual drag-order for one folder (POST /__order__ {folder, order}).

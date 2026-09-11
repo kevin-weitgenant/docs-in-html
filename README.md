@@ -49,6 +49,9 @@ with a clear error instead of silently picking another port.
   (any `<svg>` inside a `<figure>`, or anything marked `.panzoom` / `.diagram` / `.zoomable`).
   Injected automatically; clicks inside buttons/links are never hijacked. The lightbox
   has zoom buttons and a **full-screen mode** (works inside the shell's iframe too).
+- **Inline WYSIWYG editing** — an "Editar" toggle (top-right of every doc) makes the
+  rendered page editable: click any text, type, `Ctrl+S` saves the file in place.
+  You never see HTML tags. (`Ctrl+E` toggles; `pre`/`code` blocks edit as plain text)
 - Use **your own `index.html`**, or the built-in shell when a folder has none
 - **Hide the sidebar** with the toggle button, left-aligned in the header (state remembered)
 - Zero dependencies, zero build
