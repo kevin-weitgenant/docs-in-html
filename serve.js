@@ -4,6 +4,7 @@
 //
 //   docs-in-html [dir] [--port N] [--no-open]   serve a folder (default: current dir)
 //   docs-in-html init [dir]                     scaffold a starter index.html
+//   docs-in-html export [dir] [--out DIR]       freeze to static files (Surge etc.)
 
 const http = require("node:http");
 const fs = require("node:fs");
@@ -12,6 +13,7 @@ const { exec } = require("node:child_process");
 const { createReload } = require("./reload.js");
 const { buildTree } = require("./manifest.js");
 const { SHELL } = require("./shell.js");
+const { injectScripts } = require("./inject.js");
 
 const CLIENT_DIR = path.join(__dirname, "client");
 
@@ -30,34 +32,6 @@ function send(res, status, body, headers = {}) {
   res.end(body);
 }
 
-// Splice dev scripts into HTML:
-//  - reload client (always)
-//  - nav client (only the shell — a page with #docList)
-//  - edit client (every doc EXCEPT the shell — inline WYSIWYG editing)
-//  - mermaid-zoom (docs with Mermaid blocks OR standalone diagram SVGs:
-//    <figure>, or .panzoom/.diagram/.zoomable — that don't already have pan/zoom)
-// Detection is tag-context only: a page that merely *mentions* "id=\"docList\""
-// or "mermaid-zoom" in prose (e.g. docs about this very package) must not
-// be mistaken for a shell or for a page that ships its own pan/zoom.
-// Every injected tag carries data-injected: the editor strips them before
-// saving the page back to disk via /__save__.
-function injectScripts(html) {
-  const isShell = /<[^>]+\bid\s*=\s*["']docList["']/i.test(html);
-  const tags = [`<script src="/__docs__/reload.js" data-injected></script>`];
-  if (isShell) tags.push(`<script src="/__docs__/nav.js" data-injected></script>`);
-  else tags.push(`<script src="/__docs__/edit.js" data-injected defer></script>`);
-  const wantsZoom =
-    /\bclass\s*=\s*["'][^"']*\bmermaid\b/.test(html) ||
-    /<figure[\s>]/i.test(html) ||
-    /class\s*=\s*["'][^"']*\b(panzoom|diagram|zoomable)\b/i.test(html);
-  const hasOwnZoom = /<script[^>]+src\s*=\s*["'][^"']*(?:mermaid-zoom|svg-pan-zoom)/i.test(html);
-  if (wantsZoom && !hasOwnZoom) {
-    tags.push(`<script src="/__docs__/mermaid-zoom.js" data-injected defer></script>`);
-  }
-  const block = tags.join("");
-  return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, block + "$&") : html + block;
-}
-
 function serveFile(filePath, res) {
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) return send(res, 404, "404 Not Found");
@@ -65,7 +39,7 @@ function serveFile(filePath, res) {
     const type = MIME[ext] || "application/octet-stream";
     fs.readFile(filePath, (e, data) => {
       if (e) return send(res, 500, "500 Internal Server Error");
-      const body = ext === ".html" ? injectScripts(data.toString("utf8")) : data;
+      const body = ext === ".html" ? injectScripts(data.toString("utf8"), {}) : data;
       send(res, 200, body, { "Content-Type": type });
     });
   });
@@ -86,7 +60,7 @@ function serveShell(res) {
       ? html.replace(/<head[^>]*>/i, (m) => m + '\n<base href="/">')
       : '<base href="/">\n' + html;
   }
-  send(res, 200, injectScripts(html), { "Content-Type": "text/html; charset=utf-8" });
+  send(res, 200, injectScripts(html, {}), { "Content-Type": "text/html; charset=utf-8" });
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────
@@ -96,6 +70,7 @@ function help() {
 Usage:
   docs-in-html [dir] [--port N] [--no-open]   serve a folder (default: current dir)
   docs-in-html init [dir]                     scaffold a starter index.html
+  docs-in-html export [dir] [--out DIR]       freeze to static files (default out: ./dist)
 
 Options:
   -p, --port N     port (default 8000, or $PORT; if the default is busy the
@@ -112,10 +87,13 @@ let port = Number(process.env.PORT) || 8000;
 let doOpen = true;
 let portWasExplicit = false;
 let mode = "serve";
+let outDir = "dist";
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "-h" || a === "--help") { help(); process.exit(0); }
   else if (a === "init") mode = "init";
+  else if (a === "export") mode = "export";
+  else if (a === "--out") outDir = args[++i] || outDir;
   else if (a === "-p" || a === "--port") { port = Number(args[++i]) || port; portWasExplicit = true; }
   else if (a === "--no-open") doOpen = false;
   else if (a === "-o" || a === "--open") doOpen = true;
@@ -126,6 +104,11 @@ const ROOT = path.resolve(dir);
 
 if (mode === "init") {
   require("./init.js").init(ROOT);
+  process.exit(0);
+}
+
+if (mode === "export") {
+  require("./export.js").run(ROOT, outDir);
   process.exit(0);
 }
 

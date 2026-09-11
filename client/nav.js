@@ -9,6 +9,11 @@
   var iframe = document.querySelector("iframe");
   if (!list) return;
 
+  // Static export (docs-in-html export): the tree comes from manifest.json and
+  // the sidebar is read-only — no delete/rename/mkdir/drag (those need the dev
+  // server's POST endpoints, which don't exist on a static host).
+  var EXPORT = window.DOCS_EXPORT === true;
+
   // Fullscreen (ex.: botão tela cheia do mermaid-zoom) exige isto no iframe —
   // shells customizados costumam omitir, então garantimos aqui.
   if (iframe) { try { iframe.allowFullscreen = true; } catch (e) {} }
@@ -202,7 +207,7 @@
 
   var ROOT_INFO = { root: "", sep: "/" }; // absolute path of the served folder + OS separator
   function fetchManifest(cb) {
-    fetch("/__manifest__", { cache: "no-store" })
+    fetch(EXPORT ? "/manifest.json" : "/__manifest__", { cache: EXPORT ? "default" : "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && Array.isArray(data.tree)) {
@@ -610,11 +615,14 @@
       // double-click a folder name → rename it (desktop convention)
       head.addEventListener("dblclick", function (e) {
         e.preventDefault();
+        if (EXPORT) return; // read-only in the static export
         if (!head.classList.contains("dl-edit")) startRename(entry);
       });
       li.appendChild(head);
-      head.appendChild(makeKebab(entry));
-      enableDrag(li, entry);
+      if (!EXPORT) {
+        head.appendChild(makeKebab(entry));
+        enableDrag(li, entry);
+      }
       if (hasKids) {
         var wrap = document.createElement("div"); // animated "frame" around the list
         wrap.className = "dl-wrap";
@@ -643,11 +651,14 @@
     // double-click a file name → rename it (desktop convention)
     a.addEventListener("dblclick", function (e) {
       e.preventDefault();
+      if (EXPORT) return; // read-only in the static export
       if (!a.classList.contains("dl-edit")) startRename(entry2);
     });
     li2.appendChild(a);
-    a.appendChild(makeKebab(entry2));
-    enableDrag(li2, entry2);
+    if (!EXPORT) {
+      a.appendChild(makeKebab(entry2));
+      enableDrag(li2, entry2);
+    }
     return li2;
   }
 
@@ -678,7 +689,7 @@
       menu.appendChild(it);
       return it;
     };
-    mkItem('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', "New folder", function () { createFolder(); });
+    if (!EXPORT) mkItem('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', "New folder", function () { createFolder(); });
     mkItem('<path d="m6 9 6 6 6-6"/>', "Collapse all", collapseAll);
     ctxEl = menu;
     document.body.appendChild(menu);

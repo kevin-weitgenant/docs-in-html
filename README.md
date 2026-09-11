@@ -25,6 +25,7 @@ docs-in-html ./docs-html              # serve a folder (opens the browser)
 docs-in-html ./docs --port 5000       # custom port
 docs-in-html ./docs --no-open         # don't auto-open
 docs-in-html init ./new-docs          # scaffold a starter index.html
+docs-in-html export ./docs --out dist # freeze to static files (Surge etc.)
 ```
 
 If the default port (8000, or `$PORT`) is already in use — e.g. another
@@ -37,6 +38,27 @@ used automatically, with a warning:
 
 An explicit `--port` is a request, not a hint: if it's busy, the server exits
 with a clear error instead of silently picking another port.
+
+## Deploy (static hosting)
+
+The dev server is only for local use — but the whole experience survives on a
+static host. `export` freezes what the server decides at runtime (the sidebar
+tree, the injected pan/zoom scripts) into plain files:
+
+```bash
+docs-in-html export ./docs    # → ./dist with everything baked in
+surge dist                   # or Netlify Drop, GitHub Pages...
+```
+
+What `dist/` contains: your HTMLs **with the script tags already written in**,
+a `manifest.json` (tree + manual order + folder icons), and `__docs__/` (the
+client scripts the tags reference). On the static site the sidebar works,
+pan/zoom works — but it's read-only (no delete/rename/new-folder/drag; those
+need the dev server). The shell is the entry point; opening a doc's URL
+directly works standalone, just without the sidebar. Publish from the root of
+the output folder (absolute `/__docs__/...` paths don't survive sub-path
+hosting like `user.github.io/projeto/`). Live reload and inline editing stay
+dev-only, by design.
 
 ## Features
 
