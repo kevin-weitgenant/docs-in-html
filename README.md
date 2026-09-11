@@ -27,6 +27,17 @@ docs-in-html ./docs --no-open         # don't auto-open
 docs-in-html init ./new-docs          # scaffold a starter index.html
 ```
 
+If the default port (8000, or `$PORT`) is already in use — e.g. another
+`docs-in-html` instance serving a different folder — the next free port is
+used automatically, with a warning:
+
+```
+⚠ porta 8000 está em uso — usando 8001
+```
+
+An explicit `--port` is a request, not a hint: if it's busy, the server exits
+with a clear error instead of silently picking another port.
+
 ## Features
 
 - **Auto sidebar tree** generated from your folder structure (collapsible, with collapse memory,

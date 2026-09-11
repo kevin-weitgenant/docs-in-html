@@ -93,7 +93,9 @@ Usage:
   docs-in-html init [dir]                     scaffold a starter index.html
 
 Options:
-  -p, --port N     port (default 8000, or $PORT)
+  -p, --port N     port (default 8000, or $PORT; if the default is busy the
+                   next free port is used with a warning — an explicit --port
+                   must be free or the server exits with an error)
       --no-open    don't open the browser automatically
   -h, --help       show this help
 `);
@@ -103,12 +105,13 @@ const args = process.argv.slice(2);
 let dir = ".";
 let port = Number(process.env.PORT) || 8000;
 let doOpen = true;
+let portWasExplicit = false;
 let mode = "serve";
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "-h" || a === "--help") { help(); process.exit(0); }
   else if (a === "init") mode = "init";
-  else if (a === "-p" || a === "--port") port = Number(args[++i]) || port;
+  else if (a === "-p" || a === "--port") { port = Number(args[++i]) || port; portWasExplicit = true; }
   else if (a === "--no-open") doOpen = false;
   else if (a === "-o" || a === "--open") doOpen = true;
   else if (!a.startsWith("-")) dir = a;
@@ -313,14 +316,54 @@ const server = http.createServer((req, res) => {
 });
 
 server.on("close", () => reload.close());
-server.listen(port, () => {
-  const url = `http://localhost:${port}`;
-  console.log(`docs-in-html · serving ${ROOT}`);
-  console.log(`  → ${url}`);
-  if (doOpen) {
-    const cmd = process.platform === "win32" ? `start "" "${url}"`
-      : process.platform === "darwin" ? `open "${url}"`
-      : `xdg-open "${url}"`;
-    exec(cmd, () => {});
-  }
-});
+
+// If --port was passed explicitly, it's a request, not a hint: succeed on that
+// exact port or die with a clear message. Otherwise (default/$PORT) fall back
+// to the next free port, with a warning, so a second docs-in-html serving
+// another folder just works.
+const MAX_FALLBACKS = 20;
+function start(attemptPort, attemptsLeft) {
+  let printed = false;
+  const srv = server.listen(attemptPort, () => {
+    // On Windows the 'listening' callback can fire before a pending EADDRINUSE;
+    // defer the banner one tick so a failed attempt never prints.
+    setImmediate(() => {
+      if (printed) return;
+      printed = true;
+      const url = `http://localhost:${attemptPort}`;
+      console.log(`docs-in-html · serving ${ROOT}`);
+      if (attemptPort !== port)
+        console.log(`  ⚠ porta ${port} está em uso — usando ${attemptPort}`);
+      console.log(`  → ${url}`);
+      if (doOpen) {
+        const cmd = process.platform === "win32" ? `start "" "${url}"`
+          : process.platform === "darwin" ? `open "${url}"`
+          : `xdg-open "${url}"`;
+        exec(cmd, () => {});
+      }
+    });
+  });
+  srv.once("error", (err) => {
+    printed = true;
+    if (err.code !== "EADDRINUSE") {
+      const tip = err.code === "EACCES"
+        ? " (porta privilegiada? tente uma alta, ex.: --port 8000)" : "";
+      console.error(`erro: não foi possível abrir a porta ${attemptPort}${tip}`);
+      if (err.code !== "EACCES") console.error(`       ${err.message}`);
+      process.exit(1);
+    }
+    if (portWasExplicit) {
+      console.error(`erro: porta ${attemptPort} já está em uso.`);
+      console.error("       pode ser outra instância de docs-in-html; feche-a, ou rode sem --port para auto-escolher a próxima livre.");
+      process.exit(1);
+    }
+    if (attemptsLeft <= 0) {
+      console.error(`erro: nenhuma porta livre a partir de ${port} (tentou até ${attemptPort}).`);
+      console.error("       feche o outro servidor ou passe --port N.");
+      process.exit(1);
+    }
+    srv.close();
+    start(attemptPort + 1, attemptsLeft - 1);
+  });
+}
+start(port, portWasExplicit ? 0 : MAX_FALLBACKS - 1);

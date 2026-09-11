@@ -53,12 +53,12 @@
       "#docList .dl-drop{background:#e8f0fe !important;outline:2px dashed #1f6feb;outline-offset:-2px;border-radius:6px}" +
       "#docList li.dl-ins::before{content:\"\";position:absolute;left:6px;right:6px;top:-3px;height:0;border-top:2px solid #1f6feb;pointer-events:none}" +
       "#docList li.dl-dragging{opacity:.35}" +
-      ".dl-newbar{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 10px;border-bottom:1px solid #eef1f5;margin-bottom:8px}" +
-      ".dl-newbar span{font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa4b2}" +
-      ".dl-newbar button{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border:1px solid #d9dee6;background:#fff;border-radius:7px;cursor:pointer;font-size:.82rem;color:#1f2329}" +
-      ".dl-newbar button:hover{background:#f6f7f9}" +
-      ".dl-newbar.dl-drop{background:#e8f0fe;outline:2px dashed #1f6feb;outline-offset:-2px;border-radius:6px}" +
-      ".dl-newbar.dl-root-hint span::after{content:\"  ← solte para mover pra raiz\";color:#1f6feb;font-weight:700;text-transform:none;letter-spacing:0;font-size:.8rem}" +
+      ".dl-ctx{position:fixed;z-index:60;min-width:150px;background:#fff;border:1px solid #d9dee6;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.13);padding:5px;font-size:.88rem;display:none}" +
+      ".dl-ctx.on{display:block}" +
+      ".dl-ctx div{padding:6px 10px;border-radius:6px;cursor:pointer;display:flex;gap:8px;align-items:center;color:#1f2329}" +
+      ".dl-ctx div:hover{background:#f6f7f9}" +
+      ".dl-ctx hr{border:none;border-top:1px solid #eef1f5;margin:4px 2px}" +
+      ".dl-ctx svg{width:14px;height:14px;color:#5b6472;flex:none}" +
       // move-to popover
       ".dl-pop{position:fixed;z-index:400;min-width:200px;max-height:260px;overflow-y:auto;background:#fff;border:1px solid #d9dee6;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.14);padding:4px;font-size:.9rem}" +
       ".dl-pop button{display:block;width:100%;text-align:left;padding:6px 12px;border:none;background:transparent;border-radius:6px;cursor:pointer;color:#1f2329;font:inherit;white-space:nowrap}" +
@@ -480,7 +480,6 @@
     if (!drag.active) {
       if (Math.abs(e.clientX - drag.startX) < 5 && Math.abs(e.clientY - drag.startY) < 5) return;
       drag.active = true;
-      if (newbarEl && canDrop({ kind: "root", path: "" })) newbarEl.classList.add("dl-root-hint");
       drag.ghost = document.createElement("div");
       drag.ghost.className = "dl-ghost";
       drag.ghost.textContent = (drag.entry.isFolder ? "\ud83d\udcc1 " : "\ud83d\udcc4 ") + basename(drag.entry.path);
@@ -507,7 +506,7 @@
       }
     }
     if (!t && el && navAside && navAside.contains(el) && !drag.li.contains(el)) {
-      t = { kind: "root", path: "", el: (newbarEl && newbarEl.contains(el)) ? newbarEl : list, li: null }; // empty space / new-folder bar → root
+      t = { kind: "root", path: "", el: list, li: null }; // empty space → root
     }
     if (t && !canDrop(t)) t = null;
     setDropTarget(t);
@@ -521,7 +520,6 @@
     if (d.ghost) d.ghost.remove();
     d.li.classList.remove("dl-dragging");
     document.body.classList.remove("dl-grabbing");
-    if (newbarEl) newbarEl.classList.remove("dl-root-hint");
     clearDropHints();
     if (d.active && d.target) {
       if (d.target.kind === "file") doReorder(d.entry, d.target);
@@ -668,21 +666,41 @@
     navAside.classList.add(c);
     animClass = c;
   }
-  var newbarEl = null;
-  if (navAside && !navAside.querySelector(".dl-newbar")) {
-    var bar = document.createElement("div");
-    bar.className = "dl-newbar";
-    var label = document.createElement("span");
-    label.textContent = "Folders";
-    var newBtn = document.createElement("button");
-    newBtn.type = "button";
-    newBtn.title = "Create a new folder at the top level";
-    newBtn.textContent = "\uff0b Folder";
-    newBtn.addEventListener("click", function () { createFolder(); });
-    bar.appendChild(label);
-    bar.appendChild(newBtn);
-    newbarEl = bar;
-    navAside.insertBefore(bar, list);
+  var ctxEl = null;
+  if (navAside && !navAside.querySelector(".dl-ctx")) {
+    var menu = document.createElement("div");
+    menu.className = "dl-ctx";
+    var mkItem = function (icon, label, fn) {
+      var it = document.createElement("div");
+      it.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + icon + "</svg>";
+      it.appendChild(document.createTextNode(label));
+      it.addEventListener("click", function () { hideCtx(); fn(); });
+      menu.appendChild(it);
+      return it;
+    };
+    mkItem('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', "New folder", function () { createFolder(); });
+    mkItem('<path d="m6 9 6 6 6-6"/>', "Collapse all", collapseAll);
+    ctxEl = menu;
+    document.body.appendChild(menu);
+
+    function hideCtx() { menu.classList.remove("on"); }
+    navAside.addEventListener("contextmenu", function (e) {
+      if (e.target.closest && e.target.closest("#docList li")) return; // rows keep the native menu
+      e.preventDefault();
+      menu.classList.add("on");
+      menu.style.left = Math.min(e.clientX, window.innerWidth - menu.offsetWidth - 8) + "px";
+      menu.style.top = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8) + "px";
+    });
+    document.addEventListener("click", hideCtx);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideCtx(); });
+    window.addEventListener("blur", hideCtx);
+  }
+
+  function collapseAll() {
+    var all = collectFolders(currentTree);
+    for (var i = 0; i < all.length; i++) collapsed[all[i].path] = true;
+    save();
+    applyTree(currentTree);
   }
 
   function createFolder() {
