@@ -1,0 +1,23 @@
+{
+  "title": "Docs-html DOCS",
+  "favicon": "📚",
+  "sidebarAnim": "guide",
+  "icons": {
+    "arquitetura": "layers",
+    "features-dificeis": "wrench"
+  },
+  "order": {
+    "New folder": [
+      "file-management-plan.html",
+      "export-command-plan.html"
+    ],
+    "": [
+      "New folder",
+      "new-folder-ui-brainstorm.html",
+      "arquitetura-do-pacote.html",
+      "export-command-plan.html",
+      "sidebar-visual-plan.html",
+      "New folder2"
+    ]
+  }
+}
