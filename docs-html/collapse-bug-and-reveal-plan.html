@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — Collapse All Bug Fix + Reveal in File Explorer</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f6f7f9;
+    --text: #1f2329;
+    --soft: #5b6472;
+    --border: #d9dee6;
+    --accent: #1f6feb;
+    --code: #f6f8fa;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.7 Georgia, "Times New Roman", serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  h1, h2, h3 { font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.3; }
+  h1 { font-size: 2rem; margin-bottom: .3rem; }
+  h2 { font-size: 1.5rem; margin-top: 3rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+  h3 { font-size: 1.15rem; margin-top: 2rem; }
+  .subtitle { color: var(--soft); font-size: 1.05rem; margin-top: 0; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.5rem; margin: 1.5rem 0 2rem; font-family: "Segoe UI", sans-serif; font-size: .95rem; }
+  nav.toc b { display: block; margin-bottom: .3rem; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .callout { background: var(--panel); border-left: 4px solid var(--accent); padding: .8rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .callout.warn { border-left-color: var(--warn); }
+  pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; font-size: .85rem; white-space: pre; }
+  code { font-family: Consolas, Menlo, monospace; font-size: .9em; background: var(--code); padding: .1em .35em; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-family: "Segoe UI", sans-serif; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .5rem .8rem; text-align: left; }
+  th { background: var(--panel); }
+  .flow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: 1.2rem 0; font-family: "Segoe UI", sans-serif; font-size: .88rem; }
+  .box { border: 1.5px solid var(--border); border-radius: 8px; padding: .5rem .9rem; background: var(--panel); }
+  .box.acc { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .box.bad { border-color: #cf222e; color: #cf222e; }
+  .arrow { color: var(--soft); font-size: 1.2rem; }
+  .quiz-q { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.3rem; margin: 1rem 0; font-family: "Segoe UI", sans-serif; }
+  .quiz-q p { margin: 0 0 .6rem; font-weight: 600; }
+  .quiz-q label { display: block; padding: .35rem .6rem; border-radius: 6px; cursor: pointer; }
+  .quiz-q label:hover { background: var(--panel); }
+  .quiz-q .fb { margin-top: .5rem; font-size: .9rem; min-height: 1.3em; }
+  .fb.right { color: var(--ok); font-weight: 600; }
+  .fb.wrong { color: #cf222e; font-weight: 600; }
+  .status { font-size: .85rem; font-weight: 600; padding: .1rem .6rem; border-radius: 999px; margin-left: .5rem; }
+  .status.ok { background: #dafbe1; color: var(--ok); }
+  .status.todo { background: #fff8c5; color: var(--warn); }
+  ul li { margin: .3rem 0; }
+  .mermaid { margin: 1.5rem 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Plan: Fix “Collapse all” + “Reveal in File Explorer”</h1>
+<p class="subtitle">Two changes in <code>docs-in-html</code>: one bug fix in <code>client/nav.js</code>, one new feature spanning <code>serve.js</code> + <code>client/nav.js</code>. No published API changes, no new dependencies.</p>
+
+<nav class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#background">Background</a></li>
+    <li><a href="#bug">Part 1 — The “Collapse all” bug</a></li>
+    <li><a href="#reveal">Part 2 — Reveal in File Explorer</a></li>
+    <li><a href="#changes">Changes by file</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="background">Background</h2>
+
+<p>The sidebar in <code>docs-in-html</code> is a file tree rendered by <code>client/nav.js</code> from a manifest that the server (<code>serve.js</code>) generates from the docs folder. Two mechanisms matter here:</p>
+
+<p><strong>Collapse state is a map, not DOM.</strong> Which folders are open/closed lives in <code>localStorage</code> as <code>docs-in-html:collapsed</code> — a plain object like <code>{"guides/": true, "api/": true}</code>. When the tree renders, each folder head gets a <code>closed</code> CSS class if its path is in that map. Clicking a chevron toggles one entry and flips the class directly — cheap, no re-render.</p>
+
+<p><strong>Re-renders are guarded by a signature.</strong> Every time a file changes on disk, the client re-fetches the manifest and calls <code>applyTree(tree)</code>. But rebuilding the DOM would wipe scroll position and any in-progress state, so <code>applyTree</code> first computes a <em>signature</em> — a string like <code>"d:guides|f:guides/a.html|d:api|…"</code> — and bails out early <em>if the signature hasn't changed</em>. The signature only encodes the <em>set of paths</em>, not their content and not the collapse state.</p>
+
+<p>On the server side, the write endpoints all follow the same pattern: a <code>POST /__something__</code> route that validates the path against <code>resolveIn()</code> (which guarantees the path resolves inside the served root), does one filesystem operation, and returns JSON. The server already knows how to open things in the OS: it uses <code>start</code> / <code>open</code> / <code>xdg-open</code> to launch the browser at startup.</p>
+
+<div class="callout">
+  <b>Beginner ramp:</b> “Shell” pages are assembled by <code>shell.js</code>/<code>inject.js</code> when you open a doc — the sidebar script runs alongside the doc in an <em>iframe</em>. The client also receives <code>ROOT_INFO</code> from the server: the absolute root path and the OS path separator (used by the existing “Copy full path” action). That channel is how the browser learns what OS it's on.
+</div>
+
+<h2 id="bug">Part 1 — The “Collapse all” bug <span class="status todo">bug</span></h2>
+
+<p>The context menu on the sidebar (right-click → “Collapse all”) calls <code>collapseAll()</code>, which does exactly the right thing to the data:</p>
+
+<pre><code>collapsed[all[i].path] = true;   // mark every folder closed
+save();                          // persist to localStorage
+applyTree(currentTree);          // …ask for a re-render
+</code></pre>
+
+<p>The flaw is that last line. <code>applyTree</code> recomputes the signature of <code>currentTree</code> — but the tree hasn't changed at all; only the localStorage map has. The signature matches the previous one, so <code>applyTree</code> <em>returns early and never rebuilds the DOM</em>. The data says “everything collapsed”; the screen still shows open folders. A refresh would fix the view, because a fresh render reads the map — the state was saved correctly, the UI just wasn't told.</p>
+
+<div class="flow">
+  <div class="box">collapseAll()</div><span class="arrow">→</span>
+  <div class="box">collapsed[...] = true</div><span class="arrow">→</span>
+  <div class="box">save() ✔</div><span class="arrow">→</span>
+  <div class="box acc">applyTree()</div><span class="arrow">→</span>
+  <div class="box bad">signature unchanged → early return</div>
+</div>
+
+<p><strong>The fix (one line):</strong> invalidate the cached signature before re-applying, so the guard can't short-circuit: set <code>currentSignature = null</code> right before calling <code>applyTree(currentTree)</code> inside <code>collapseAll()</code>. The rebuild then happens, reads the updated map, and every folder head renders with the <code>closed</code> class. This same trick is the correct pattern for any future action that changes only localStorage-backed UI state.</p>
+
+<h2 id="reveal">Part 2 — Reveal in File Explorer <span class="status todo">feature</span></h2>
+
+<p>Yes, it's possible, and cleanly: browsers can't touch the OS, but the dev server can. We add one new endpoint and one menu item.</p>
+
+<h3>Server: <code>POST /__reveal__ { path }</code></h3>
+
+<p>Same shape as <code>/__delete__</code>: validate with <code>resolveIn()</code> (so <code>../</code> tricks fail with 400), then open the OS file manager with the absolute path. Cross-platform by branching on <code>process.platform</code> — each OS has a canonical command:</p>
+
+<table>
+  <tr><th>Platform</th><th>Command</th><th>Behavior</th></tr>
+  <tr><td>Windows (<code>win32</code>)</td><td><code>explorer /select,"C:\docs\a.html"</code></td><td>Opens the parent folder <em>with the file pre-selected</em>. For folders: <code>explorer "C:\docs\guides"</code> opens it.</td></tr>
+  <tr><td>macOS (<code>darwin</code>)</td><td><code>open -R "/docs/a.html"</code></td><td><code>-R</code> = reveal &amp; select, works for both files and folders.</td></tr>
+  <tr><td>Linux</td><td><code>xdg-open "/docs"</code></td><td>No selection support in the spec — we open the containing folder for files, the folder itself for folders.</td></tr>
+</table>
+
+<div class="callout warn">
+  <b>Security note:</b> paths arrive from the browser, so we only ever spawn with an absolute path produced by <code>resolveIn()</code> — already proven to live under <code>ROOT</code>. We spawn the OS command <em>directly</em> (no shell string interpolation of user input) and ignore its exit code; worst case is a non-zero exit for a file deleted since the manifest was fetched, which we report as a plain 500 to the client. No new attack surface beyond what <code>/__delete__</code> already exposes — and reveal doesn't write anything.
+</div>
+
+<h3>Client: kebab menu item</h3>
+
+<p>In <code>makeKebab()</code> (the “⋯” button on each tree row), add one entry alongside “Copy path”: <b>“Reveal in File Explorer / Finder / Files”</b> — the label adapts to the OS. To know the OS, we extend the existing <code>ROOT_INFO</code> handshake: the server already sends <code>{ root, sep }</code> to the client; we add <code>platform: process.platform</code>. The menu item does a <code>fetch("/__reveal__", { method: "POST", body: … })</code> — fire-and-forget, no refresh needed since nothing on disk changes.</p>
+
+<div class="mermaid">
+flowchart LR
+  subgraph browser["Sidebar (iframe)"]
+    K["Kebab '⋯' menu"] -->|"POST /__reveal__ {path}"| F["fetch"]
+  end
+  F --> S["serve.js route"]
+  S --> V["resolveIn() — must live under ROOT"]
+  V -->|win32| E["explorer /select,abs"]
+  V -->|darwin| O["open -R abs"]
+  V -->|linux| X["xdg-open dir(abs)"]
+</div>
+
+<h3>Static export</h3>
+
+<p>The <code>export</code> command freezes the folder for static hosting — no server, no endpoints. The existing pattern is the <code>EXPORT</code> flag in the client, which already hides kebab buttons entirely in the export. Since the reveal item lives <em>inside</em> the kebab menu, it disappears automatically — zero extra work.</p>
+
+<h2 id="changes">Changes by file</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td><code>client/nav.js</code></td><td><b>Bug fix:</b> in <code>collapseAll()</code>, reset the cached <code>currentSignature</code> before re-applying the tree so the rebuild isn't skipped. <b>Feature:</b> in <code>makeKebab()</code>, add the OS-aware “Reveal in …” menu item that POSTs to the new endpoint; read the OS from the extended <code>ROOT_INFO</code>.</td></tr>
+  <tr><td><code>serve.js</code></td><td><b>Feature:</b> new <code>POST /__reveal__</code> route next to the other <code>__*</code> routes — validate via <code>resolveIn()</code>, then spawn <code>explorer</code> / <code>open -R</code> / <code>xdg-open</code> per platform. Add <code>platform</code> to the info the client receives about the root.</td></tr>
+</table>
+
+<p>Nothing else moves: no manifest format change, no package version bump required yet (we can bundle these into the next release), and no changes to <code>export.js</code>, <code>reload.js</code> or <code>shell.js</code>.</p>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz-q" data-answer="b">
+  <p>1. Why doesn't “Collapse all” update the sidebar today?</p>
+  <label><input type="radio" name="q1"> localStorage.setItem fails silently for large maps</label>
+  <label><input type="radio" name="q1"> applyTree early-returns because the tree signature is unchanged — the collapse map isn't part of the signature</label>
+  <label><input type="radio" name="q1"> The context menu handler never fires (a click listener swallows it)</label>
+  <label><input type="radio" name="q1"> The rebuild happens, but the CSS animation resets the folder classes</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="c">
+  <p>2. On Windows, revealing a <em>file</em> pre-selected in its folder uses which command?</p>
+  <label><input type="radio" name="q2"> <code>start "" "C:\file.html"</code></label>
+  <label><input type="radio" name="q2"> <code>explorer "C:\docs"</code></label>
+  <label><input type="radio" name="q2"> <code>explorer /select,"C:\docs\file.html"</code></label>
+  <label><input type="radio" name="q2"> <code>open -R "C:\docs\file.html"</code></label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="d">
+  <p>3. Why does Linux get different treatment than macOS?</p>
+  <label><input type="radio" name="q3"> Linux has no file managers at all</label>
+  <label><input type="radio" name="q3"> xdg-open is unsafe to call from a server</label>
+  <label><input type="radio" name="q3"> xdg-open only works on directories under /home</label>
+  <label><input type="radio" name="q3"> xdg-open has no standard “reveal and select” flag — it can only open the containing folder</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="a">
+  <p>4. What keeps <code>POST /__reveal__</code> from exposing files outside the served folder?</p>
+  <label><input type="radio" name="q4"> resolveIn() rejects any path that doesn't resolve strictly under ROOT</label>
+  <label><input type="radio" name="q4"> The browser same-origin policy blocks cross-folder paths</label>
+  <label><input type="radio" name="q4"> explorer refuses paths containing ".."</label>
+  <label><input type="radio" name="q4"> The endpoint only accepts paths ending in .html</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="b">
+  <p>5. In the static export (frozen folder on Surge/Pages), what happens to “Reveal in File Explorer”?</p>
+  <label><input type="radio" name="q5"> It stays but shows an error toast</label>
+  <label><input type="radio" name="q5"> Nothing — the whole kebab menu (including the new item) is already hidden behind the EXPORT flag</label>
+  <label><input type="radio" name="q5"> It opens the browser's download panel instead</label>
+  <label><input type="radio" name="q5"> The endpoint exists but requires a special header</label>
+  <div class="fb"></div>
+</div>
+
+<script>
+document.querySelectorAll(".quiz-q").forEach(function (q) {
+  var ans = q.dataset.answer;
+  q.querySelectorAll("label").forEach(function (lab, i) {
+    lab.querySelector("input").addEventListener("change", function () {
+      var fb = q.querySelector(".fb");
+      var opts = "abcd";
+      if (opts[i] === ans) {
+        fb.textContent = "✔ Correct!";
+        fb.className = "fb right";
+      } else {
+        fb.textContent = "✘ Not quite — try again.";
+        fb.className = "fb wrong";
+      }
+    });
+  });
+});
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true });
+</script>
+
+</div>
+</body>
+</html>

@@ -9,7 +9,7 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const { exec } = require("node:child_process");
+const { exec, spawn } = require("node:child_process");
 const { createReload } = require("./reload.js");
 const { buildTree } = require("./manifest.js");
 const { SHELL } = require("./shell.js");
@@ -162,7 +162,7 @@ const server = http.createServer((req, res) => {
   const raw = (req.url || "/").split("?")[0];
 
   if (raw === "/__manifest__") {
-    const body = JSON.stringify({ root: ROOT, sep: path.sep, anim: readAnim(), tree: buildTree(ROOT) });
+    const body = JSON.stringify({ root: ROOT, sep: path.sep, platform: process.platform, anim: readAnim(), tree: buildTree(ROOT) });
     return send(res, 200, body, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   }
 
@@ -272,6 +272,30 @@ const server = http.createServer((req, res) => {
     }, 10 * 1024 * 1024); // whole-page HTML — allow up to 10 MB
   }
 
+  // Reveal a doc/folder in the OS file manager (POST /__reveal__ {path}).
+  // Cross-platform: Windows "explorer /select," (opens + pre-selected),
+  // macOS "open -R" (reveal), Linux "xdg-open" on the containing folder
+  // (the XDG spec has no select flag). Spawned without a shell; the path is
+  // validated by resolveIn() so it always lives under ROOT. Exit codes are
+  // ignored — explorer often exits non-zero even on success.
+  if (req.method === "POST" && raw === "/__reveal__") {
+    return readJsonBody(req, (j) => {
+      const t = resolveIn(j && j.path);
+      if (!t) return send(res, 400, "400 Bad Request");
+      fs.stat(t.abs, (err, st) => {
+        if (err || !st) return send(res, 404, "404 Not Found");
+        if (process.platform === "win32") {
+          spawn("explorer", st.isDirectory() ? [t.abs] : [`/select,${t.abs}`], { detached: true, stdio: "ignore" }).unref();
+        } else if (process.platform === "darwin") {
+          spawn("open", ["-R", t.abs], { detached: true, stdio: "ignore" }).unref();
+        } else {
+          spawn("xdg-open", [st.isDirectory() ? t.abs : path.dirname(t.abs)], { detached: true, stdio: "ignore" }).unref();
+        }
+        send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
+      });
+    });
+  }
+
   // Persist a manual drag-order for one folder (POST /__order__ {folder, order}).
   // Stored in ROOT/_order.json — the leading _ keeps it hidden from the manifest.
   if (req.method === "POST" && raw === "/__order__") {
@@ -365,7 +389,9 @@ function start(attemptPort, attemptsLeft) {
       console.error("       feche o outro servidor ou passe --port N.");
       process.exit(1);
     }
-    srv.close();
+    // NB: a failed listen leaves nothing to close — srv.close() here would
+    // emit 'close' and (via reload.close()) kill the file watcher forever.
+    if (srv.listening) srv.close();
     start(attemptPort + 1, attemptsLeft - 1);
   });
 }

@@ -205,13 +205,13 @@
     return el;
   }
 
-  var ROOT_INFO = { root: "", sep: "/" }; // absolute path of the served folder + OS separator
+  var ROOT_INFO = { root: "", sep: "/", platform: "" }; // root path, OS separator, OS itself
   function fetchManifest(cb) {
     fetch(EXPORT ? "/manifest.json" : "/__manifest__", { cache: EXPORT ? "default" : "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && Array.isArray(data.tree)) {
-          ROOT_INFO = { root: data.root || "", sep: data.sep || "/" };
+          ROOT_INFO = { root: data.root || "", sep: data.sep || "/", platform: data.platform || "" };
           if (data.anim) setAnim(data.anim);
         }
         cb(data && Array.isArray(data.tree) ? data.tree : data); // old shape: bare array
@@ -288,6 +288,14 @@
     m.style.top = (r.bottom + mh > window.innerHeight - 8 ? Math.max(8, r.top - mh) : r.bottom + 4) + "px";
     openMenu = m;
   }
+  // OS-aware label for the reveal action (Explorer / Finder / Files).
+  function revealLabel() {
+    var name = ROOT_INFO.platform === "win32" ? "File Explorer"
+      : ROOT_INFO.platform === "darwin" ? "Finder"
+      : "Files";
+    return "\u2197  Reveal in " + name;
+  }
+
   function makeKebab(entry) { // entry: {path, isFolder, labelEl}
     var btn = document.createElement("button");
     btn.type = "button";
@@ -307,6 +315,13 @@
         { label: "\u29c9  Copy full path", onClick: function () {
             var abs = ROOT_INFO.root ? ROOT_INFO.root.replace(/[\\/]+$/, "") + ROOT_INFO.sep + entry.path.split("/").join(ROOT_INFO.sep) : entry.path;
             copyText(abs, "Copied: " + abs);
+          } },
+        { label: revealLabel(), onClick: function () {
+            fetch("/__reveal__", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: entry.path })
+            }).catch(function () {});
           } },
         { label: "\u21c4  Move to\u2026", onClick: function () { showMovePopover(btn, entry); } },
         { label: "\u2715  Delete", danger: true, armed: true, onClick: function () { doDelete(entry); } }
@@ -711,6 +726,7 @@
     var all = collectFolders(currentTree);
     for (var i = 0; i < all.length; i++) collapsed[all[i].path] = true;
     save();
+    currentSignature = null; // force rebuild — the tree is unchanged, only localStorage state
     applyTree(currentTree);
   }
 

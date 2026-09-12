@@ -22,7 +22,10 @@ function createReload(root) {
       clearTimeout(timers[rel]);
       timers[rel] = setTimeout(() => { delete timers[rel]; broadcast(rel); }, 150);
     });
-    watcher.on("error", () => {});
+    watcher.on("error", (e) => {
+      console.warn(`[docs-in-html] hot reload watcher error: ${e.message}`);
+      console.warn("                     salve um arquivo para testar; se nada acontecer, reinicie o servidor.");
+    });
   } catch {
     console.warn("[docs-in-html] fs.watch unavailable — hot reload disabled (static serving still works).");
   }
