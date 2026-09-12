@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan — One _config.json for Everything</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f6f7f9;
+    --text: #1f2329;
+    --soft: #5b6472;
+    --border: #d9dee6;
+    --accent: #1f6feb;
+    --code: #f6f8fa;
+    --ok: #1a7f37;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.7 Georgia, "Times New Roman", serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  h1, h2, h3 { font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.3; }
+  h1 { font-size: 2rem; margin-bottom: .3rem; }
+  h2 { font-size: 1.5rem; margin-top: 3rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+  h3 { font-size: 1.15rem; margin-top: 2rem; }
+  .subtitle { color: var(--soft); font-size: 1.05rem; margin-top: 0; }
+  nav.toc { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.5rem; margin: 1.5rem 0 2rem; font-family: "Segoe UI", sans-serif; font-size: .95rem; }
+  nav.toc b { display: block; margin-bottom: .3rem; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .callout { background: var(--panel); border-left: 4px solid var(--accent); padding: .8rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .callout.warn { border-left-color: #9a6700; }
+  pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; font-size: .85rem; white-space: pre; }
+  code { font-family: Consolas, Menlo, monospace; font-size: .9em; background: var(--code); padding: .1em .35em; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-family: "Segoe UI", sans-serif; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .5rem .8rem; text-align: left; vertical-align: top; }
+  th { background: var(--panel); }
+  .cols { display: flex; gap: 1.2rem; flex-wrap: wrap; margin: 1.2rem 0; }
+  .cols > div { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 10px; padding: .8rem 1.1rem; background: var(--panel); }
+  .cols h4 { margin: 0 0 .5rem; font-family: "Segoe UI", sans-serif; font-size: .95rem; }
+  .quiz-q { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.3rem; margin: 1rem 0; font-family: "Segoe UI", sans-serif; }
+  .quiz-q p { margin: 0 0 .6rem; font-weight: 600; }
+  .quiz-q label { display: block; padding: .35rem .6rem; border-radius: 6px; cursor: pointer; }
+  .quiz-q label:hover { background: var(--panel); }
+  .fb { margin-top: .5rem; font-size: .9rem; min-height: 1.3em; }
+  .fb.right { color: var(--ok); font-weight: 600; }
+  .fb.wrong { color: #cf222e; font-weight: 600; }
+  .mermaid { margin: 1.5rem 0; text-align: center; }
+  ul li { margin: .3rem 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Plan: Um só <code>_config.json</code> pra governar tudo</h1>
+<p class="subtitle">Título da página, favicon, animação da sidebar, ícones de pasta e ordem de drag — hoje espalhados em três arquivos e hardcoded no shell — passam a morar num único JSON editável.</p>
+
+<nav class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#background">Background — onde as coisas moram hoje</a></li>
+    <li><a href="#intuition">A proposta: o formato do <code>_config.json</code></a></li>
+    <li><a href="#auto">Auto-scaffold no primeiro serve</a></li>
+    <li><a href="#changes">Mudanças por arquivo</a></li>
+    <li><a href="#compat">Compatibilidade e migração</a></li>
+    <li><a href="#export">E o export? Como o config se comporta lá</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="background">Background — onde as coisas moram hoje</h2>
+
+<p>Hoje existem <strong>três</strong> fontes de configuração, mais dois valores hardcoded:</p>
+
+<table>
+  <tr><th>O quê</th><th>Onde está hoje</th><th>Quem lê/escreve</th></tr>
+  <tr><td>Animação da sidebar (<code>reveal</code>/<code>slide</code>/<code>guide</code>)</td><td><code>_config.json</code> → <code>sidebarAnim</code></td><td><code>serve.js</code> (<code>readAnim</code>) e <code>export.js</code> — <em>já existe!</em></td></tr>
+  <tr><td>Ícones de pasta</td><td><code>_icons.json</code> — <code>{"guides": "book-open", "dados": "🧮"}</code></td><td>lido no <code>manifest.js</code>; mantido sincronizado pelo <code>serve.js</code> ao renomear/mover/deletar (<code>shiftIcons</code>/<code>pruneIcons</code>)</td></tr>
+  <tr><td>Ordem manual (drag) por pasta</td><td><code>_order.json</code> — <code>{"": ["b.html","a.html"], "guides": [...]}</code></td><td>lido no <code>manifest.js</code>; escrito pelo <code>POST /__order__</code></td></tr>
+  <tr><td>Título da aba do navegador</td><td>Hardcoded: <code>&lt;title&gt;Docs&lt;/title&gt;</code> no <code>shell.js</code></td><td>ninguém — imutável</td></tr>
+  <tr><td>Favicon</td><td>Nenhum (o 📚 do header é só texto, a aba fica sem ícone)</td><td>—</td></tr>
+</table>
+
+<div class="callout">
+  <b>Detalhe importante:</b> o shell tem duas encarnações. No <strong>dev server</strong> (<code>serve.js</code>) ele é gerado por request e pode ser o <code>index.html</code> do usuário, se existir. No <strong>export estático</strong> (<code>export.js</code>) ele é escrito no disco uma vez. Qualquer mudança de título/favicon precisa cobrir <em>os dois caminhos</em> — e o export não pode depender de endpoints de servidor.
+</div>
+
+<h2 id="intuition">A proposta: o formato do <code>_config.json</code></h2>
+
+<p>O <code>_config.json</code> já existe e já é escondido da sidebar (prefixo <code>_</code>). A ideia é promovê-lo a <strong>arquivo único de configuração do site</strong>, absorvendo os outros dois:</p>
+
+<pre><code>{
+  "title": "Minha Docação — Handbook",
+  "favicon": "🚀",
+  "sidebarAnim": "slide",
+  "icons": { "guides": "book-open", "dados": "🧮" },
+  "order": { "": ["intro.html", "comecando.html"], "guides": ["api.html"] }
+}</code></pre>
+
+<h3>Título</h3>
+
+<p><code>title</code> substitui o <code>&lt;title&gt;</code> da aba <em>e</em> o texto <code>📚 Docs · live</code> do header do shell. No dev server, o <code>serve.js</code> injeta o valor ao servir o shell (mesmo lugar onde já injeta o <code>&lt;base href="/"&gt;</code>). No export, o <code>export.js</code> escreve o título direto no <code>index.html</code> congelado. Bônus barato: o <code>nav.js</code> pode atualizar o título da aba conforme o doc aberto ("<em>Introdução · Minha Docação</em>") — o navegador mostra onde você está sem olhar pra sidebar.</p>
+
+<h3>Favicon</h3>
+
+<p>Duas formas aceitas, para que "fácil" seja realmente fácil:</p>
+
+<ul>
+  <li><strong>Emoji</strong> (<code>"favicon": "🚀"</code>) — o servidor gera na hora um mini-SVG com o emoji (<code>&lt;text&gt;🚀&lt;/text&gt;</code>) e injeta <code>&lt;link rel="icon" href="data:image/svg+xml,…"&gt;</code>. Zero arquivos, funciona até no export (data URI vai embora embutida no HTML congelado).</li>
+  <li><strong>Path de arquivo</strong> (<code>"favicon": "assets/favicon.svg"</code>) — injeta <code>&lt;link rel="icon" href="/assets/favicon.svg"&gt;</code>. O arquivo precisa existir na pasta de docs (o export copia a pasta inteira, então vai junto de graça).</li>
+</ul>
+
+<h3>Ícones e ordem migram pra dentro</h3>
+
+<div class="mermaid">
+flowchart LR
+  subgraph antes["Antes — 3 arquivos"]
+    C1["_config.json (anim)"]
+    C2["_icons.json"]
+    C3["_order.json"]
+  end
+  subgraph depois["Depois — 1 arquivo"]
+    C["_config.json<br/>title · favicon · sidebarAnim<br/>icons · order"]
+  end
+  C1 --> C
+  C2 --> C
+  C3 --> C
+</div>
+
+<p>O <code>manifest.js</code> passa a ler <code>icons</code> e <code>order</code> de dentro do <code>_config.json</code>. O <code>serve.js</code> passa a <em>escrever</em> neles no mesmo lugar (o <code>shiftIcons</code>/<code>pruneIcons</code> e o <code>POST /__order__</code> já fazem o bookkeeping — só trocam o arquivo de destino).</p>
+
+<h2 id="auto">Auto-scaffold no primeiro serve</h2>
+
+<p><strong>Novato no pacote, zero passos:</strong> quando você roda <code>docs-in-html nome_pasta</code> e a pasta ainda não tem <code>_config.json</code>, o servidor cria um com defaults espertos:</p>
+
+<pre><code>{
+  "title": "Nome Da Pasta",
+  "favicon": "📚",
+  "sidebarAnim": "guide"
+}</code></pre>
+
+<p>O título é o nome da pasta humanizado — a mesma regra que o sidebar já usa pra arquivos (<code>meu-projeto</code> → <code>Meu Projeto</code>). O terminal avisa na primeira vez:</p>
+
+<pre><code>docs-in-html · serving C:\docs\meu-projeto
+  ✓ criado _config.json — ajuste title/favicon lá (hot reload pega na hora)
+  → http://localhost:8000</code></pre>
+
+<p>Como o arquivo já vem com as chaves certas e o live reload observa a pasta, trocar o título vira: abrir o JSON, editar uma linha, salvar — a aba atualiza sozinha. Edição manual de JSON é a UI mais barata que existe; um endpoint de settings seria superdimensionamento.</p>
+
+<div class="callout warn">
+  <b>Quem cria o arquivo é só o <code>serve</code>, nunca o <code>export</code>:</b> o comando de export é read-only na pasta fonte (detalhes na próxima seção) — ele não deve surpreender ninguém escrevendo arquivos numa pasta que só está sendo congelada.
+</div>
+
+<h2 id="changes">Mudanças por arquivo</h2>
+
+<table>
+  <tr><th>Arquivo</th><th>Mudança</th></tr>
+  <tr><td><code>serve.js</code></td><td>Uma função <code>readConfig()</code> única (substitui <code>readAnim</code>/<code>loadIcons</code>): lê o <code>_config.json</code> uma vez por request. Ao servir o shell, aplica <strong>title</strong> (replace no <code>&lt;title&gt;</code> e no header) e <strong>favicon</strong> (injeta o <code>&lt;link rel="icon"&gt;</code> com data-URI ou path). Os writes de bookkeeping (<code>shift</code>/<code>prune</code> de ícones, <code>__order__</code>) passam a editar as seções <code>icons</code>/<code>order</code> do config, preservando as demais chaves. O <code>/__manifest__</code> já leva <code>anim</code>; passa a levar <code>title</code> também (para o bônus do título por doc, no cliente).</td></tr>
+  <tr><td><code>manifest.js</code></td><td><code>buildTree</code> lê <code>order</code> e <code>icons</code> do <code>_config.json</code> (com fallback pros arquivos legados, ver abaixo).</td></tr>
+  <tr><td><code>export.js</code></td><td>O shell congelado (<code>index.html</code>) recebe o mesmo tratamento de title/favicon que o dev server aplica. O export não escreve config novo — só lê.</td></tr>
+  <tr><td><code>shell.js</code></td><td>Nenhuma mudança de conteúdo — o shell continua o template neutro (<code>&lt;title&gt;Docs&lt;/title&gt;</code> como placeholder que será substituído); adicionamos um <code>&lt;!--title--&gt;</code>-friendly hook se o replace por string ficar frágil.</td></tr>
+  <tr><td><code>client/nav.js</code></td><td>Bônus: usar o <code>title</code> do manifest para reescrever <code>document.title</code> como <em>"Nome do doc · Título do site"</em> quando o doc muda no iframe.</td></tr>
+  <tr><td><code>init.js</code></td><td>Novos projetos via <code>init</code> também ganham o <code>_config.json</code> de exemplo (mesmos defaults do auto-scaffold).</td></tr>
+</table>
+
+<h2 id="compat">Compatibilidade e migração</h2>
+
+<p>Não queremos quebrar ninguém (nem você mesmo) que já tem <code>_icons.json</code>/<code>_order.json</code> funcionando:</p>
+
+<div class="cols">
+  <div>
+    <h4>Leitura (sem quebra)</h4>
+    Prioridade: seção <code>icons</code>/<code>order</code> do <code>_config.json</code> vence; se ausente, cai para o <code>_icons.json</code>/<code>_order.json</code> legado. O <code>sidebarAnim</code> continua válido como alias — quem já usa <code>_config.json</code> pra animação não percebe nada.
+  </div>
+  <div>
+    <h4>Escrita (migração preguiçosa)</h4>
+    O primeiro write (reordenar, trocar ícone, renomear pasta) <em>absorve</em> o legado: lê os dois arquivos velhos, escreve tudo no <code>_config.json</code> e deixa os antigos intocados (ignorados daí em diante). Sem comando de migração, sem quebra — os arquivos velhos viram vestígio inofensivo.
+  </div>
+</div>
+
+<div class="callout warn">
+  <b>Caso de borda — index.html do usuário:</b> quando a pasta tem <code>index.html</code> próprio, ele é o shell. Title e favicon aí são responsabilidade do autor do HTML — mas o dev server injeta o <code>&lt;link rel="icon"&gt;</code> mesmo assim se a página não tiver um, e o título só é aplicado se o <code>&lt;title&gt;</code> dele for o default "Docs".
+</div>
+
+<h2 id="export">E o export? Como o config se comporta lá</h2>
+
+<p>O comando <code>export</code> congela a pasta <strong>uma vez</strong>: copia tudo, gera o <code>manifest.json</code> com a árvore pronta (ordem e ícones já aplicados) e reescreve os HTMLs com as tags injetadas. No site estático não existe servidor — então o config é <strong>assado (baked), não lido</strong>:</p>
+
+<div class="cols">
+  <div>
+    <h4>O que é assado no export</h4>
+    <ul>
+      <li><strong>Título e favicon</strong> — escritos de vez no <code>index.html</code> congelado (mesma injeção do dev server, só que no disco). O favicon-emoji vira data URI embutida.</li>
+      <li><strong>Ordem e ícones</strong> — aplicados pelo <code>buildTree</code> na geração do <code>manifest.json</code>.</li>
+      <li><strong>Animação</strong> — vai dentro do <code>manifest.json</code> (já é assim hoje com o <code>sidebarAnim</code>).</li>
+    </ul>
+  </div>
+  <div>
+    <h4>O que não vai junto</h4>
+    <ul>
+      <li>O <code>_config.json</code> em si — inútil no estático (ninguém lê) e <em>copiado hoje por acaso</em>, junto com <code>_order.json</code>/<code>_icons.json</code>. A mudança: o <code>copyDir</code> do export passa a <strong>pular esses arquivos de configuração</strong> no output. Pasta publicada mais limpa, sem vazar o “porão” de configuração.</li>
+      <li>Writes — o export nunca escreve na pasta fonte (nem cria <code>_config.json</code> lá): ele só lê. Se a fonte não tem config, usa os defaults (<code>Docs</code>, sem favicon).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout">
+  <b>Tradução prática:</b> dev server = config vivo, recém-lido a cada request (o watcher até dá hot reload quando você salva o JSON). Export = fotografia: tudo que o config decidiu fica gravado nos arquivos finais, e o JSON deixa de ser necessário. Editar o <code>_config.json</code> depois do export muda o site dev, não o congelado — exporta de novo pra atualizar.
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz-q" data-answer="b">
+  <p>1. Por que o formato emoji do favicon funciona "de graça" no export estático?</p>
+  <label><input type="radio" name="q1"> O export embute um servidor de ícones</label>
+  <label><input type="radio" name="q1"> O emoji vira um data URI SVG embutido no HTML congelado — nenhum arquivo extra é necessário</label>
+  <label><input type="radio" name="q1"> Navegadores têm emojis de favicon nativos</label>
+  <label><input type="radio" name="q1"> O export copia node_modules junto</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="c">
+  <p>2. O que acontece com um usuário que já tem <code>_order.json</code> e nunca cria <code>_config.json</code>?</p>
+  <label><input type="radio" name="q2"> A ordem manual para de funcionar até ele migrar manualmente</label>
+  <label><input type="radio" name="q2"> O servidor apaga o _order.json e recria como _config.json no boot</label>
+  <label><input type="radio" name="q2"> A leitura cai para o legado; no primeiro write, o conteúdo é absorvido pelo _config.json</label>
+  <label><input type="radio" name="q2"> Nada — os dois arquivos passam a disputar a ordem</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="a">
+  <p>3. Por que title/favicon precisam de cuidado em DOIS lugares do código?</p>
+  <label><input type="radio" name="q3"> O shell existe em duas encarnações: gerado por request no dev server e congelado em disco pelo export</label>
+  <label><input type="radio" name="q3"> Porque o título muda quando a porta muda</label>
+  <label><input type="radio" name="q3"> Porque navegadores exigem título duplicado em HTTP e HTML</label>
+  <label><input type="radio" name="q3"> Não — só o serve.js precisaria mudar</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="d">
+  <p>4. Quando a pasta tem um <code>index.html</code> próprio, o que o plano faz com o título?</p>
+  <label><input type="radio" name="q4"> Sobrescreve sempre — config vence</label>
+  <label><input type="radio" name="q4"> Ignora o index.html e usa o shell embutido</label>
+  <label><input type="radio" name="q4"> Renomeia o title do index.html no disco</label>
+  <label><input type="radio" name="q4"> Só aplica se o &lt;title&gt; do index for o default "Docs" — senão respeita o autor</label>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz-q" data-answer="b">
+  <p>5. Quem passa a escrever no <code>_config.json</code>?</p>
+  <label><input type="radio" name="q5"> Ninguém — é read-only, como o _config.json de hoje</label>
+  <label><input type="radio" name="q5"> O próprio servidor, nos bookkeepings existentes: drag-ordem (__order__), renomear/mover (shift), deletar (prune)</label>
+  <label><input type="radio" name="q5"> O cliente, via localStorage sincronizado</label>
+  <label><input type="radio" name="q5"> Um novo CLI dedicado</label>
+  <div class="fb"></div>
+</div>
+
+<script>
+document.querySelectorAll(".quiz-q").forEach(function (q) {
+  var ans = q.dataset.answer;
+  q.querySelectorAll("label").forEach(function (lab, i) {
+    lab.querySelector("input").addEventListener("change", function () {
+      var fb = q.querySelector(".fb");
+      if ("abcd"[i] === ans) { fb.textContent = "✔ Correto!"; fb.className = "fb right"; }
+      else { fb.textContent = "✘ Quase — tenta de novo."; fb.className = "fb wrong"; }
+    });
+  });
+});
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true });
+</script>
+
+</div>
+</body>
+</html>

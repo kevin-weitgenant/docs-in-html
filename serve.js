@@ -55,6 +55,7 @@ function serveShell(res) {
     fs.existsSync(idx) && fs.statSync(idx).isFile()
       ? fs.readFileSync(idx, "utf8")
       : SHELL;
+  html = applyShellConfig(html, readConfig(ROOT)); // title + favicon from _config.json
   if (!/<base\s/i.test(html)) {
     html = /<head[^>]*>/i.test(html)
       ? html.replace(/<head[^>]*>/i, (m) => m + '\n<base href="/">')
@@ -112,27 +113,30 @@ if (mode === "export") {
   process.exit(0);
 }
 
-// ── server ───────────────────────────────────────────────────────────────
-// Sidebar collapse animation variant ("reveal" | "slide" | "guide"), from an
-// optional ROOT/_config.json — e.g. { "sidebarAnim": "slide" }. Default: guide.
-function readAnim() {
-  try {
-    const v = JSON.parse(fs.readFileSync(path.join(ROOT, "_config.json"), "utf8")).sidebarAnim;
-    return ["reveal", "slide", "guide"].includes(v) ? v : "guide";
-  } catch { return "guide"; }
+// ── server ─────────────────────────────────────────────────────────────────
+// All settings live in ROOT/_config.json (title, favicon, sidebarAnim, icons,
+// order) — read per-request so edits hot-reload. Legacy _icons.json/_order.json
+// are merged as fallback by readConfig; writes absorb them into the config.
+const { readConfig, writeConfig, defaultConfig, applyShellConfig } = require("./config.js");
+
+// Auto-scaffold: first serve of a folder with no _config.json creates one with
+// friendly defaults (title from the folder name) so discovery is zero-effort.
+let scaffolded = false;
+if (!fs.existsSync(path.join(ROOT, "_config.json"))) {
+  writeConfig(ROOT, defaultConfig(ROOT));
+  scaffolded = true; // writeConfig swallows errors; the flag is just for the banner
 }
 
-// Keep _icons.json keys in sync when files/folders are renamed/moved/deleted
-// from the sidebar — same idea as the _order.json bookkeeping.
-function loadIcons() {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT, "_icons.json"), "utf8")); } catch { return null; }
+function readAnim() {
+  const v = readConfig(ROOT).sidebarAnim;
+  return ["reveal", "slide", "guide"].includes(v) ? v : "guide";
 }
-function saveIcons(data) {
-  try { fs.writeFileSync(path.join(ROOT, "_icons.json"), JSON.stringify(data, null, 2) + "\n"); } catch {}
-}
+
+// Keep config.icons keys in sync when files/folders are renamed/moved/deleted
+// from the sidebar — same idea as the config.order bookkeeping.
 function shiftIcons(from, to) { // rename/move: rewrite the key and descendant keys
-  const data = loadIcons();
-  if (!data) return;
+  const cfg = readConfig(ROOT);
+  const data = cfg.icons || {};
   let changed = false;
   const out = {};
   for (const k of Object.keys(data)) {
@@ -140,18 +144,18 @@ function shiftIcons(from, to) { // rename/move: rewrite the key and descendant k
     else if (k.startsWith(from + "/")) { out[to + k.slice(from.length)] = data[k]; changed = true; }
     else out[k] = data[k];
   }
-  if (changed) saveIcons(out);
+  if (changed) { cfg.icons = out; writeConfig(ROOT, cfg); }
 }
 function pruneIcons(rel) { // delete: drop the key and descendant keys
-  const data = loadIcons();
-  if (!data) return;
+  const cfg = readConfig(ROOT);
+  const data = cfg.icons || {};
   const out = {};
   let changed = false;
   for (const k of Object.keys(data)) {
     if (k === rel || k.startsWith(rel + "/")) { changed = true; continue; }
     out[k] = data[k];
   }
-  if (changed) saveIcons(out);
+  if (changed) { cfg.icons = out; writeConfig(ROOT, cfg); }
 }
 
 const reload = createReload(ROOT);
@@ -162,7 +166,8 @@ const server = http.createServer((req, res) => {
   const raw = (req.url || "/").split("?")[0];
 
   if (raw === "/__manifest__") {
-    const body = JSON.stringify({ root: ROOT, sep: path.sep, platform: process.platform, anim: readAnim(), tree: buildTree(ROOT) });
+    const cfg = readConfig(ROOT);
+    const body = JSON.stringify({ root: ROOT, sep: path.sep, platform: process.platform, anim: readAnim(), title: typeof cfg.title === "string" ? cfg.title : "", tree: buildTree(ROOT) });
     return send(res, 200, body, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   }
 
@@ -297,21 +302,20 @@ const server = http.createServer((req, res) => {
   }
 
   // Persist a manual drag-order for one folder (POST /__order__ {folder, order}).
-  // Stored in ROOT/_order.json — the leading _ keeps it hidden from the manifest.
+  // Stored in the config.order section of ROOT/_config.json (absorbs a legacy
+  // _order.json on the first write). The leading _ keeps the file hidden from
+  // the manifest.
   if (req.method === "POST" && raw === "/__order__") {
     return readJsonBody(req, (j) => {
       const folder = j && j.folder === "" ? "" : safeRelPath(j.folder);
       const order = j && Array.isArray(j.order) ? j.order : null;
       if (folder === null || !order || order.some((s) => typeof s !== "string" || !safeRelPath(s)))
         return send(res, 400, "400 Bad Request");
-      const file = path.join(ROOT, "_order.json");
-      let data = {};
-      try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
-      data[folder] = order;
-      fs.writeFile(file, JSON.stringify(data, null, 2) + "\n", (err) => {
-        if (err) return send(res, 500, "500 write failed");
-        send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
-      });
+      const cfg = readConfig(ROOT);
+      cfg.order = cfg.order || {};
+      cfg.order[folder] = order;
+      try { writeConfig(ROOT, cfg); } catch { return send(res, 500, "500 write failed"); }
+      send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
     });
   }
 
@@ -361,6 +365,8 @@ function start(attemptPort, attemptsLeft) {
       console.log(`docs-in-html · serving ${ROOT}`);
       if (attemptPort !== port)
         console.log(`  ⚠ porta ${port} está em uso — usando ${attemptPort}`);
+      if (scaffolded)
+        console.log(`  ✓ criado _config.json — ajuste title/favicon lá (hot reload pega na hora)`);
       console.log(`  → ${url}`);
       if (doOpen) {
         const cmd = process.platform === "win32" ? `start "" "${url}"`

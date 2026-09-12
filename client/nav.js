@@ -206,17 +206,33 @@
   }
 
   var ROOT_INFO = { root: "", sep: "/", platform: "" }; // root path, OS separator, OS itself
+  var SITE_TITLE = ""; // from _config.json → manifest.title — used for per-doc tab titles
   function fetchManifest(cb) {
     fetch(EXPORT ? "/manifest.json" : "/__manifest__", { cache: EXPORT ? "default" : "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && Array.isArray(data.tree)) {
           ROOT_INFO = { root: data.root || "", sep: data.sep || "/", platform: data.platform || "" };
+          SITE_TITLE = data.title || "";
           if (data.anim) setAnim(data.anim);
         }
         cb(data && Array.isArray(data.tree) ? data.tree : data); // old shape: bare array
       })
       .catch(function () {});
+  }
+
+  // Tab title: "Doc Name · Site Title" (site title alone when nothing is open).
+  function syncTitle(path) {
+    var name = null;
+    (function walk(arr) {
+      (arr || []).some(function (n) {
+        if (n.path === path) { name = n.name; return true; }
+        if (n.type === "folder") walk(n.children);
+        return false;
+      });
+    })(currentTree);
+    document.title = name && SITE_TITLE ? name + " · " + SITE_TITLE
+      : name || SITE_TITLE || document.title;
   }
   function copyText(text, okMsg) {
     function fallback() {
@@ -793,6 +809,7 @@
     skipSyncPush = true;
     if (iframe) iframe.src = "/" + path;
     setActive(path);
+    syncTitle(path);
     try {
       if (push === false) history.replaceState({ docsPath: path }, "", "/" + path);
       else history.pushState({ docsPath: path }, "", "/" + path);

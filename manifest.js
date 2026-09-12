@@ -4,31 +4,17 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { humanize, readConfig } = require("./config.js");
 
 // "auth-service.html" → "Auth Service"; "backend" → "Backend"
-// Capitalize the first letter of each word. Per-word with String#toUpperCase
-// (Unicode-aware) — NOT /\b\w/ which is ASCII-only and mangles "Integração" → "IntegraçãO".
-function humanize(name) {
-  return name
-    .replace(/\.[^.]+$/, "")
-    .replace(/[-_]+/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.replace(/^./u, (c) => c.toUpperCase()))
-    .join(" ")
-    .trim();
-}
+// (moved to config.js — shared with the auto-scaffold default title)
 
 function buildTree(root) {
-  // Manual drag-order (written by POST /__order__): { "": ["b.html","a.html"], "guides": [...] }
-  let order = {};
-  try { order = JSON.parse(fs.readFileSync(path.join(root, "_order.json"), "utf8")); } catch {}
-  // Icons apply to FOLDERS only (per-entry, from _icons.json):
-  // { "guides": "book-open", "dados": "🧮" } — values are either a Lucide-style
-  // name (rendered from the embedded SVG set in nav.js) or a non-ASCII string,
-  // which renders as-is (emoji). Doc entries are ignored.
-  let icons = {};
-  try { icons = JSON.parse(fs.readFileSync(path.join(root, "_icons.json"), "utf8")); } catch {}
+  // All settings live in _config.json (icons/order sections); legacy
+  // _icons.json/_order.json are merged in as fallback by readConfig.
+  const cfg = readConfig(root);
+  const order = cfg.order || {};
+  const icons = cfg.icons || {};
   const sortByOrder = (rel, entries) => {
     const ord = order[rel || ""] || [];
     return entries.slice().sort((a, b) => {
