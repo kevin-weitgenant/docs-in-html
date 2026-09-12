@@ -1,5 +1,2 @@
 node_modules/
-*.tgz
-.vscode/
-docs-html/
-nul
+dist/
