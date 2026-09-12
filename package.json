@@ -34,6 +34,7 @@
     "reload.js",
     "manifest.js",
     "shell.js",
+    "config.js",
     "init.js",
     "export.js",
     "inject.js",
