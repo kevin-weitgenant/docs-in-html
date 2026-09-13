@@ -6,7 +6,7 @@
   // Who am I? The shell (a page with #docList) may also live at a deep URL
   // (/docs/foo.html) after F5 — identify it by structure, not by pathname.
   var isShell = !!document.getElementById("docList");
-  var me = isShell ? "index.html" : location.pathname.replace(/^\/+/, "") || "index.html";
+  var me = (isShell ? "index.html" : decodeURI(location.pathname).replace(/^\/+/, "")) || "index.html";
 
   function shouldReload(changed) {
     if (changed === me) return true;             // my own file changed
