@@ -81,9 +81,8 @@ function applyShellConfig(html, cfg) {
   const title = typeof cfg.title === "string" ? cfg.title.trim() : "";
   if (title) {
     out = out.replace(/<title>\s*Docs\s*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
-    // built-in shell header: "📚 <span>Docs <span class=dot>·</span> live</span>"
-    out = out.replace(/(<header class="top">[\s\S]*?<span>)([^<]+?)(\s*<span class="dot")/, (m, a, t, b) =>
-      t.trim() === "Docs" ? a + escapeHtml(title) + b : m);
+    // built-in shell header: the editable <span id="dl-title">…</span>
+    out = out.replace(/(<span id="dl-title">)[^<]*(<\/span>)/i, (m, a, b) => a + escapeHtml(title) + b);
   }
   const link = faviconLink(cfg.favicon);
   if (link && !/<link[^>]+rel\s*=\s*["']?icon/i.test(out)) {

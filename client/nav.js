@@ -214,6 +214,8 @@
         if (data && Array.isArray(data.tree)) {
           ROOT_INFO = { root: data.root || "", sep: data.sep || "/", platform: data.platform || "" };
           SITE_TITLE = data.title || "";
+          var tEl = document.getElementById("dl-title");
+          if (tEl && !tEl.classList.contains("dl-edit") && data.title) tEl.textContent = data.title;
           if (data.anim) setAnim(data.anim);
         }
         cb(data && Array.isArray(data.tree) ? data.tree : data); // old shape: bare array
@@ -796,6 +798,26 @@
     setSidebar(!(navAside && navAside.classList.contains("dl-collapsed")));
   });
   setSidebar(startHidden);
+
+  // ── editable header title (#dl-title) — double-click to rename; saved to
+  // _config.json via POST /__title__ (the file change refreshes the manifest,
+  // which re-syncs the span and the tab title). Custom shells without the
+  // span are simply not editable; the title still comes from _config.json.
+  var titleEl = document.getElementById("dl-title");
+  if (titleEl && !EXPORT) {
+    titleEl.title = "Double-click to rename";
+    titleEl.addEventListener("dblclick", function () {
+      if (titleEl.classList.contains("dl-edit")) return; // already editing
+      startEdit(titleEl, SITE_TITLE || "", "", function (name) {
+        var n = name.trim().slice(0, 200);
+        if (!n) { toast("Title cannot be empty", true); return; }
+        if (n === SITE_TITLE) return; // nothing changed
+        api("/__title__", { title: n }).catch(function (err) {
+          toast("Could not save title: " + err.message, true);
+        });
+      });
+    });
+  }
 
   function build(nodes) {
     var frag = document.createDocumentFragment();

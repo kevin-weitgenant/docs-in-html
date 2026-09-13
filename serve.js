@@ -319,6 +319,19 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  // Set the site title (POST /__title__ {title}) — persisted to _config.json;
+  // the watcher's own event then refreshes the shell/manifest on the client.
+  if (req.method === "POST" && raw === "/__title__") {
+    return readJsonBody(req, (j) => {
+      const title = j && typeof j.title === "string" ? j.title.trim().slice(0, 200) : "";
+      if (!title) return send(res, 400, "400 Bad Request");
+      const cfg = readConfig(ROOT);
+      cfg.title = title;
+      try { writeConfig(ROOT, cfg); } catch { return send(res, 500, "500 write failed"); }
+      send(res, 200, JSON.stringify({ ok: true }), { "Content-Type": "application/json; charset=utf-8" });
+    });
+  }
+
   if (raw.startsWith("/__docs__/")) {
     const f = path.join(CLIENT_DIR, path.normalize(raw.slice("/__docs__/".length)));
     if (f !== CLIENT_DIR && !f.startsWith(CLIENT_DIR + path.sep)) return send(res, 404, "404");
